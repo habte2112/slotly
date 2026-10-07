@@ -1,0 +1,14 @@
+node_modules
+.env
+dist
+
+# AI tool folders
+.agents
+.claude
+.cursor
+.devin
+.windsurf
+skills-lock.json
+
+# Prisma generated client
+server/src/generated
