@@ -1,13 +1,7 @@
 import { Request, Response } from "express";
 import { z } from "zod";
-import { prisma } from "../lib/prisma";
-import {
-  computeAvailableSlots,
-  dayBoundsUtc,
-  dayOfWeek,
-  isValidDateString,
-  TIMEZONE,
-} from "../services/availability";
+import { isValidDateString, TIMEZONE } from "../services/availability";
+import { loadAvailability } from "../services/availability.service";
 
 const querySchema = z.object({
   date: z.string().refine(isValidDateString, "date must be a valid YYYY-MM-DD"),
@@ -24,51 +18,18 @@ export async function getAvailability(req: Request, res: Response) {
     return;
   }
   const { date, serviceId } = parsed.data;
-  const providerId = String(req.params.id);
 
-  const offering = await prisma.providerService.findUnique({
-    where: { providerId_serviceId: { providerId, serviceId } },
-    include: { service: true },
-  });
-  if (!offering || !offering.service.isActive) {
+  const result = await loadAvailability(String(req.params.id), serviceId, date);
+  if (!result) {
     res.status(404).json({ message: "Provider does not offer this service" });
     return;
   }
 
-  const { start: dayStart, end: dayEnd } = dayBoundsUtc(date);
-
-  const [workingHours, bookings, timeOff] = await Promise.all([
-    prisma.workingHour.findMany({ where: { providerId, dayOfWeek: dayOfWeek(date) } }),
-    prisma.booking.findMany({
-      where: {
-        providerId,
-        status: { in: ["PENDING", "CONFIRMED"] },
-        startAt: { lt: dayEnd },
-        endAt: { gt: dayStart },
-      },
-      select: { startAt: true, endAt: true },
-    }),
-    prisma.timeOff.findMany({
-      where: { providerId, startAt: { lt: dayEnd }, endAt: { gt: dayStart } },
-      select: { startAt: true, endAt: true },
-    }),
-  ]);
-
-  const busy = [...bookings, ...timeOff].map((r) => ({ start: r.startAt, end: r.endAt }));
-
-  const slots = computeAvailableSlots({
-    date,
-    windows: workingHours,
-    durationMinutes: offering.service.durationMinutes,
-    busy,
-    now: new Date(),
-  });
-
   res.json({
     date,
     timezone: TIMEZONE,
-    durationMinutes: offering.service.durationMinutes,
-    slots: slots.map((s) => ({
+    durationMinutes: result.service.durationMinutes,
+    slots: result.slots.map((s) => ({
       start: s.start.toISOString(),
       end: s.end.toISOString(),
       label: s.label,
