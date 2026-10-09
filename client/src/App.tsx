@@ -1,37 +1,17 @@
-import { useEffect, useState } from "react";
-import { getServices, type Service } from "./lib/api";
+import { Route, Routes } from "react-router-dom";
+import Layout from "./components/Layout";
+import Home from "./pages/Home";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
 
 export default function App() {
-  const [services, setServices] = useState<Service[]>([]);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    getServices()
-      .then(setServices)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, []);
-
   return (
-    <main className="mx-auto max-w-3xl p-6">
-      <h1 className="text-3xl font-bold text-gray-900">Slotly</h1>
-      <p className="mt-1 text-gray-600">Book your appointment in a few clicks.</p>
-
-      {loading && <p className="mt-6 text-gray-500">Loading services...</p>}
-      {error && <p className="mt-6 text-red-600">{error}</p>}
-
-      <ul className="mt-6 grid gap-4 sm:grid-cols-2">
-        {services.map((s) => (
-          <li key={s.id} className="rounded-xl border border-gray-200 p-4 shadow-sm">
-            <h2 className="font-semibold text-gray-900">{s.name}</h2>
-            <p className="mt-1 text-sm text-gray-600">{s.description}</p>
-            <p className="mt-3 text-sm text-gray-700">
-              {s.durationMinutes} min · <span className="font-medium">{s.price} ETB</span>
-            </p>
-          </li>
-        ))}
-      </ul>
-    </main>
+    <Routes>
+      <Route element={<Layout />}>
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+      </Route>
+    </Routes>
   );
 }
