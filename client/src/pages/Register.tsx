@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/auth-context";
 
 export default function Register() {
   const { signUp } = useAuth();
   const navigate = useNavigate();
+    const location = useLocation();
+    const from = (location.state as { from?: string } | null)?.from ?? "/";
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -18,7 +20,7 @@ export default function Register() {
     setSubmitting(true);
     try {
       await signUp({ name, email, phone: phone.trim() || undefined, password });
-      navigate("/");
+        navigate(from);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {

@@ -1,8 +1,11 @@
 import { Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
+import ProtectedRoute from "./components/ProtectedRoute";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import BookingPage from "./pages/BookingPage";
+import MyBookings from "./pages/MyBookings";
 
 export default function App() {
   return (
@@ -11,6 +14,10 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/book/:serviceId" element={<BookingPage />} />
+        <Route element={<ProtectedRoute />}>
+          <Route path="/my-bookings" element={<MyBookings />} />
+        </Route>
       </Route>
     </Routes>
   );
