@@ -5,6 +5,7 @@ import { authRouter } from "./routes/auth.routes";
 import { servicesRouter } from "./routes/services.routes";
 import { providersRouter } from "./routes/providers.routes";
 import { bookingsRouter } from "./routes/bookings.routes";
+import { providerDashboardRouter } from "./routes/provider-dashboard.routes";
 
 export const app = express();
 
@@ -20,6 +21,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/services", servicesRouter);
 app.use("/api/providers", providersRouter);
 app.use("/api/bookings", bookingsRouter);
+app.use("/api/provider", providerDashboardRouter);
 // ያልተጠበቀ ስህተት ሁሉ እዚህ ይያዛል (ከራውተሮች በኋላ መሆን አለበት)
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err);

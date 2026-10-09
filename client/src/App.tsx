@@ -6,6 +6,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import BookingPage from "./pages/BookingPage";
 import MyBookings from "./pages/MyBookings";
+import Dashboard from "./pages/Dashboard";
 
 export default function App() {
   return (
@@ -16,6 +17,9 @@ export default function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/book/:serviceId" element={<BookingPage />} />
         <Route element={<ProtectedRoute />}>
+                <Route element={<ProtectedRoute role="PROVIDER" />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+        </Route>
           <Route path="/my-bookings" element={<MyBookings />} />
         </Route>
       </Route>

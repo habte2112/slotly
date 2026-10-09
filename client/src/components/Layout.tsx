@@ -14,6 +14,11 @@ export default function Layout() {
           <div className="flex items-center gap-4 text-sm">
             {user ? (
               <>
+                {user.role === "PROVIDER" && (
+                  <Link to="/dashboard" className="text-gray-700 hover:text-gray-900">
+                    Dashboard
+                  </Link>
+                )}
                 <Link to="/my-bookings" className="text-gray-700 hover:text-gray-900">
                   My bookings
                 </Link>

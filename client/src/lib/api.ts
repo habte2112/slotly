@@ -127,3 +127,57 @@ export const getMyBookings = () => request<{ bookings: Booking[] }>("/bookings/m
 
 export const cancelBooking = (id: string) =>
   request<{ booking: Booking }>(`/bookings/${id}/cancel`, { method: "PATCH" }).then((r) => r.booking);
+
+// ---- Provider dashboard ----
+export interface WorkingWindow {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+}
+
+export interface TimeOff {
+  id: string;
+  startAt: string;
+  endAt: string;
+  reason: string | null;
+}
+
+export interface ProviderBooking {
+  id: string;
+  startAt: string;
+  endAt: string;
+  status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
+  notes: string | null;
+  customer: { name: string; phone: string | null };
+  service: { name: string; durationMinutes: number };
+}
+
+export const getProviderMe = () =>
+  request<{
+    provider: { id: string; name: string; bio: string | null };
+    workingHours: WorkingWindow[];
+    timeOff: TimeOff[];
+  }>("/provider/me");
+
+export const saveWorkingHours = (windows: WorkingWindow[]) =>
+  request<{ workingHours: WorkingWindow[] }>("/provider/working-hours", {
+    method: "PUT",
+    body: JSON.stringify({ windows }),
+  });
+
+export const addTimeOff = (input: { startAt: string; endAt: string; reason?: string }) =>
+  request<{ timeOff: TimeOff }>("/provider/time-off", { method: "POST", body: JSON.stringify(input) }).then(
+    (r) => r.timeOff,
+  );
+
+export const deleteTimeOff = (id: string) =>
+  request<{ success: boolean }>(`/provider/time-off/${id}`, { method: "DELETE" });
+
+export const getProviderBookings = (scope: "upcoming" | "past") =>
+  request<{ bookings: ProviderBooking[] }>(`/provider/bookings?scope=${scope}`).then((r) => r.bookings);
+
+export const updateProviderBookingStatus = (id: string, status: "COMPLETED" | "CANCELLED") =>
+  request<{ booking: ProviderBooking }>(`/provider/bookings/${id}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  }).then((r) => r.booking);
