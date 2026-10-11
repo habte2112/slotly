@@ -12,7 +12,9 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
     return;
   }
   try {
-    const payload = jwt.verify(header.slice(7), process.env.JWT_SECRET!) as jwt.JwtPayload;
+        const payload = jwt.verify(header.slice(7), process.env.JWT_SECRET!, {
+      algorithms: ["HS256"],
+    }) as jwt.JwtPayload;
     req.user = { id: payload.sub as string, role: payload.role as string };
     next();
   } catch {

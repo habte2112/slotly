@@ -181,3 +181,13 @@ export const updateProviderBookingStatus = (id: string, status: "COMPLETED" | "C
     method: "PATCH",
     body: JSON.stringify({ status }),
   }).then((r) => r.booking);
+
+  // ---- Reschedule ----
+export const getRescheduleSlots = (bookingId: string, date: string) =>
+  request<{ slots: Slot[] }>(`/bookings/${bookingId}/availability?date=${date}`).then((r) => r.slots);
+
+export const rescheduleBooking = (id: string, startAt: string) =>
+  request<{ booking: Booking }>(`/bookings/${id}/reschedule`, {
+    method: "PATCH",
+    body: JSON.stringify({ startAt }),
+  }).then((r) => r.booking);

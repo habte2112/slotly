@@ -70,14 +70,22 @@ export default function MyBookings() {
                   {b.status.toLowerCase()}
                 </span>
               </div>
-              {active && upcoming && (
-                <button
-                  onClick={() => onCancel(b.id)}
-                  disabled={busyId === b.id}
-                  className="rounded-lg border border-gray-300 px-3 py-1 text-sm hover:bg-gray-100 disabled:opacity-50"
-                >
-                  {busyId === b.id ? "Cancelling..." : "Cancel"}
-                </button>
+            {active && upcoming && (
+                <div className="flex gap-2">
+                  <Link
+                    to={`/reschedule/${b.id}`}
+                    className="rounded-lg border border-gray-300 px-3 py-1 text-sm hover:bg-gray-100"
+                  >
+                    Reschedule
+                  </Link>
+                  <button
+                    onClick={() => onCancel(b.id)}
+                    disabled={busyId === b.id}
+                    className="rounded-lg border border-gray-300 px-3 py-1 text-sm hover:bg-gray-100 disabled:opacity-50"
+                  >
+                    {busyId === b.id ? "Cancelling..." : "Cancel"}
+                  </button>
+                </div>
               )}
             </li>
           );

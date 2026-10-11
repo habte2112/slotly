@@ -2,15 +2,29 @@ import { Response } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { AuthRequest } from "../middleware/auth";
+import { isValidDateString, TIMEZONE } from "../services/availability";
 import { loadAvailability } from "../services/availability.service";
 
 const OFFSET_MS = 3 * 60 * 60 * 1000; // Africa/Addis_Ababa (UTC+3)
 
+// የአዲስ አበባ የአካባቢ ቀን "YYYY-MM-DD"
+function localDate(d: Date): string {
+  return new Date(d.getTime() + OFFSET_MS).toISOString().slice(0, 10);
+}
+
+const isoDate = z.string().refine((s) => !Number.isNaN(Date.parse(s)), "startAt must be an ISO date");
+
 const createSchema = z.object({
   providerId: z.string().min(1),
   serviceId: z.string().min(1),
-  startAt: z.string().refine((s) => !Number.isNaN(Date.parse(s)), "startAt must be an ISO date"),
+  startAt: isoDate,
   notes: z.string().trim().max(500).optional(),
+});
+
+const rescheduleSchema = z.object({ startAt: isoDate });
+
+const dateQuerySchema = z.object({
+  date: z.string().refine(isValidDateString, "date must be a valid YYYY-MM-DD"),
 });
 
 const bookingSelect = {
@@ -54,10 +68,7 @@ export async function createBooking(req: AuthRequest, res: Response) {
   const { providerId, serviceId, notes } = parsed.data;
   const startAt = new Date(parsed.data.startAt);
 
-  // የተጠየቀው ሰዓት የሚገኝበትን የአካባቢ ቀን አውጣ
-  const date = new Date(startAt.getTime() + OFFSET_MS).toISOString().slice(0, 10);
-
-  const availability = await loadAvailability(providerId, serviceId, date);
+  const availability = await loadAvailability(providerId, serviceId, localDate(startAt));
   if (!availability) {
     res.status(404).json({ message: "Provider does not offer this service" });
     return;
@@ -78,7 +89,6 @@ export async function createBooking(req: AuthRequest, res: Response) {
     });
     res.status(201).json({ booking });
   } catch (error) {
-    // ሁለት ሰዎች በአንድ ጊዜ ሲይዙ ዳታቤዙ ሁለተኛውን ይከለክላል
     if (isOverlapError(error)) {
       res.status(409).json({ message: "This time slot was just taken" });
       return;
@@ -123,4 +133,94 @@ export async function cancelBooking(req: AuthRequest, res: Response) {
     select: bookingSelect,
   });
   res.json({ booking: updated });
+}
+
+// ለማዛወር የሚገኙ ሰዓቶች (የራሱን ቀጠሮ ሳይቆጥር)
+export async function getRescheduleAvailability(req: AuthRequest, res: Response) {
+  const parsed = dateQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ message: "date must be a valid YYYY-MM-DD" });
+    return;
+  }
+  const booking = await prisma.booking.findUnique({ where: { id: String(req.params.id) } });
+  if (!booking) {
+    res.status(404).json({ message: "Booking not found" });
+    return;
+  }
+  if (booking.customerId !== req.user!.id && req.user!.role !== "ADMIN") {
+    res.status(403).json({ message: "Forbidden" });
+    return;
+  }
+
+  const result = await loadAvailability(booking.providerId, booking.serviceId, parsed.data.date, booking.id);
+  if (!result) {
+    res.status(409).json({ message: "This service is no longer available" });
+    return;
+  }
+  res.json({
+    date: parsed.data.date,
+    timezone: TIMEZONE,
+    slots: result.slots.map((s) => ({ start: s.start.toISOString(), end: s.end.toISOString(), label: s.label })),
+  });
+}
+
+export async function rescheduleBooking(req: AuthRequest, res: Response) {
+  const parsed = rescheduleSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: "Invalid input" });
+    return;
+  }
+  const id = String(req.params.id);
+  const booking = await prisma.booking.findUnique({ where: { id } });
+
+  if (!booking) {
+    res.status(404).json({ message: "Booking not found" });
+    return;
+  }
+  if (booking.customerId !== req.user!.id && req.user!.role !== "ADMIN") {
+    res.status(403).json({ message: "Forbidden" });
+    return;
+  }
+  if (booking.status !== "PENDING" && booking.status !== "CONFIRMED") {
+    res.status(409).json({ message: `Booking is already ${booking.status.toLowerCase()}` });
+    return;
+  }
+  if (booking.startAt <= new Date()) {
+    res.status(409).json({ message: "Cannot reschedule a booking that already started" });
+    return;
+  }
+
+  const startAt = new Date(parsed.data.startAt);
+  if (startAt.getTime() === booking.startAt.getTime()) {
+    res.status(400).json({ message: "Please choose a different time" });
+    return;
+  }
+
+  const availability = await loadAvailability(booking.providerId, booking.serviceId, localDate(startAt), booking.id);
+  if (!availability) {
+    res.status(409).json({ message: "This service is no longer available" });
+    return;
+  }
+  if (!availability.slots.some((s) => s.start.getTime() === startAt.getTime())) {
+    res.status(409).json({ message: "This time slot is not available" });
+    return;
+  }
+
+  const endAt = new Date(startAt.getTime() + availability.service.durationMinutes * 60 * 1000);
+
+  try {
+    // አንድ UPDATE ስለሆነ atomic ነው፤ የ database constraint ከሌሎች ቀጠሮዎች ጋር መደራረብን ይከለክላል
+    const updated = await prisma.booking.update({
+      where: { id },
+      data: { startAt, endAt },
+      select: bookingSelect,
+    });
+    res.json({ booking: updated });
+  } catch (error) {
+    if (isOverlapError(error)) {
+      res.status(409).json({ message: "This time slot was just taken" });
+      return;
+    }
+    throw error;
+  }
 }

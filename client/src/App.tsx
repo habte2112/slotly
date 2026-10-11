@@ -7,6 +7,7 @@ import Register from "./pages/Register";
 import BookingPage from "./pages/BookingPage";
 import MyBookings from "./pages/MyBookings";
 import Dashboard from "./pages/Dashboard";
+import Reschedule from "./pages/Reschedule";
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="/dashboard" element={<Dashboard />} />
         </Route>
           <Route path="/my-bookings" element={<MyBookings />} />
+          <Route path="/reschedule/:id" element={<Reschedule />} />
         </Route>
       </Route>
     </Routes>

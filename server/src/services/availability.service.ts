@@ -1,7 +1,12 @@
 import { prisma } from "../lib/prisma";
 import { computeAvailableSlots, dayBoundsUtc, dayOfWeek } from "./availability";
 
-export async function loadAvailability(providerId: string, serviceId: string, date: string) {
+export async function loadAvailability(
+  providerId: string,
+  serviceId: string,
+  date: string,
+  excludeBookingId?: string,
+) {
   const offering = await prisma.providerService.findUnique({
     where: { providerId_serviceId: { providerId, serviceId } },
     include: { service: true },
@@ -18,6 +23,7 @@ export async function loadAvailability(providerId: string, serviceId: string, da
         status: { in: ["PENDING", "CONFIRMED"] },
         startAt: { lt: dayEnd },
         endAt: { gt: dayStart },
+        ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
       },
       select: { startAt: true, endAt: true },
     }),

@@ -5,6 +5,9 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { AuthRequest } from "../middleware/auth";
 
+// ተጠቃሚው ባይኖርም bcrypt ንጽጽር እንዲሰራ፣ ስለዚህ የምላሽ ጊዜ email መኖሩን አያሳይም
+const DUMMY_HASH = bcrypt.hashSync("not-a-real-password", 12);
+
 const registerSchema = z.object({
   name: z.string().trim().min(2).max(80),
   email: z.string().trim().toLowerCase().email(),
@@ -21,6 +24,7 @@ function signToken(user: { id: string; role: string }) {
   return jwt.sign({ role: user.role }, process.env.JWT_SECRET!, {
     subject: user.id,
     expiresIn: "7d",
+    algorithm: "HS256",
   });
 }
 
@@ -60,9 +64,9 @@ export async function login(req: Request, res: Response) {
   }
   const { email, password } = parsed.data;
 
-  const user = await prisma.user.findUnique({ where: { email } });
-  const valid = user && (await bcrypt.compare(password, user.passwordHash));
-  if (!user || !valid) {
+    const user = await prisma.user.findUnique({ where: { email } });
+    const passwordOk = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH);
+    if (!user || !passwordOk) {
     // ኢሜይሉ ስህተት ይሁን ፓስዎርዱ ተመሳሳይ መልስ (መረጃ እንዳይሰጥ)
     res.status(401).json({ message: "Invalid email or password" });
     return;
