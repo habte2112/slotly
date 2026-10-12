@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma";
 import { AuthRequest } from "../middleware/auth";
 import { isValidDateString, TIMEZONE } from "../services/availability";
 import { loadAvailability } from "../services/availability.service";
+import { notifyBooking } from "../services/email.service";
 
 const OFFSET_MS = 3 * 60 * 60 * 1000; // Africa/Addis_Ababa (UTC+3)
 
@@ -88,6 +89,7 @@ export async function createBooking(req: AuthRequest, res: Response) {
       select: bookingSelect,
     });
     res.status(201).json({ booking });
+    notifyBooking("confirmed", booking.id);
   } catch (error) {
     if (isOverlapError(error)) {
       res.status(409).json({ message: "This time slot was just taken" });
@@ -133,6 +135,11 @@ export async function cancelBooking(req: AuthRequest, res: Response) {
     select: bookingSelect,
   });
   res.json({ booking: updated });
+    notifyBooking(
+    booking.customerId === req.user!.id ? "cancelled_by_customer" : "cancelled_by_provider",
+    updated.id,
+  );
+
 }
 
 // ለማዛወር የሚገኙ ሰዓቶች (የራሱን ቀጠሮ ሳይቆጥር)
@@ -212,10 +219,11 @@ export async function rescheduleBooking(req: AuthRequest, res: Response) {
     // አንድ UPDATE ስለሆነ atomic ነው፤ የ database constraint ከሌሎች ቀጠሮዎች ጋር መደራረብን ይከለክላል
     const updated = await prisma.booking.update({
       where: { id },
-      data: { startAt, endAt },
+    data: { startAt, endAt, reminderSentAt: null },
       select: bookingSelect,
     });
     res.json({ booking: updated });
+    notifyBooking("rescheduled", updated.id);
   } catch (error) {
     if (isOverlapError(error)) {
       res.status(409).json({ message: "This time slot was just taken" });

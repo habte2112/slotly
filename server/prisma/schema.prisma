@@ -98,6 +98,7 @@ model Booking {
   status     BookingStatus @default(CONFIRMED)
   notes      String?
   createdAt  DateTime      @default(now())
+  reminderSentAt DateTime?
 
   customer User     @relation("CustomerBookings", fields: [customerId], references: [id])
   provider Provider @relation(fields: [providerId], references: [id])

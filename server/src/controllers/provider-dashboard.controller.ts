@@ -2,6 +2,7 @@ import { Response } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { AuthRequest } from "../middleware/auth";
+import { notifyBooking } from "../services/email.service";
 
 async function getOwnProvider(req: AuthRequest, res: Response) {
   const provider = await prisma.provider.findUnique({
@@ -209,5 +210,6 @@ export async function updateBookingStatus(req: AuthRequest, res: Response) {
     data: { status: parsed.data.status },
     select: providerBookingSelect,
   });
+    if (parsed.data.status === "CANCELLED") notifyBooking("cancelled_by_provider", updated.id);
   res.json({ booking: updated });
 }

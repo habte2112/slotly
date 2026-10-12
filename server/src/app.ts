@@ -9,6 +9,7 @@ import { servicesRouter } from "./routes/services.routes";
 import { providersRouter } from "./routes/providers.routes";
 import { bookingsRouter } from "./routes/bookings.routes";
 import { providerDashboardRouter } from "./routes/provider-dashboard.routes";
+import { internalRouter } from "./routes/internal.routes";
 
 export const app = express();
 
@@ -36,6 +37,7 @@ app.use("/api/services", servicesRouter);
 app.use("/api/providers", providersRouter);
 app.use("/api/bookings", bookingsRouter);
 app.use("/api/provider", providerDashboardRouter);
+app.use("/api/internal", internalRouter);
 
 // ስህተቶች እዚህ ይያዛሉ (ከራውተሮች በኋላ)
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
