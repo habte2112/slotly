@@ -8,6 +8,8 @@ import BookingPage from "./pages/BookingPage";
 import MyBookings from "./pages/MyBookings";
 import Dashboard from "./pages/Dashboard";
 import Reschedule from "./pages/Reschedule";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 export default function App() {
   return (
@@ -16,6 +18,8 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/book/:serviceId" element={<BookingPage />} />
         <Route element={<ProtectedRoute />}>
                 <Route element={<ProtectedRoute role="PROVIDER" />}>

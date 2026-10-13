@@ -29,3 +29,12 @@ export const loginLimiter = rateLimit({
   keyGenerator: (req) => `login:${String(req.body?.email ?? "").trim().toLowerCase()}`,
   message: { message: "Too many failed login attempts, please try again in 15 minutes" },
 });
+
+// ለእያንዳንዱ email በሰዓት 5 ጥያቄ (ኢሜይል መኖሩን አይገልጽም፤ ገደቡ ለሁሉም አንድ ነው)
+export const forgotPasswordLimiter = rateLimit({
+  ...common,
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  keyGenerator: (req) => `forgot:${String(req.body?.email ?? "").trim().toLowerCase()}`,
+  message: { message: "Too many reset requests, please try again later" },
+});

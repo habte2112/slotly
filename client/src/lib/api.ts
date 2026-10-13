@@ -191,3 +191,13 @@ export const rescheduleBooking = (id: string, startAt: string) =>
     method: "PATCH",
     body: JSON.stringify({ startAt }),
   }).then((r) => r.booking);
+
+  // ---- Password reset ----
+export const forgotPassword = (email: string) =>
+  request<{ message: string }>("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) });
+
+export const resetPassword = (token: string, password: string) =>
+  request<{ message: string }>("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
+  });

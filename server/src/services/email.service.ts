@@ -196,3 +196,48 @@ export async function processReminders(minAgeMinutes = 120, now = new Date()) {
 
   return { due: due.length, sent, failed, skipped, emailEnabled: true };
 }
+
+// token ወይም link በ log ውስጥ አይታተምም
+export async function sendPasswordResetEmail(to: string, name: string, token: string): Promise<boolean> {
+  try {
+    if (!resend) {
+      console.log("[email] skipped (RESEND_API_KEY not set): password reset");
+      return false;
+    }
+    const link = `${env.APP_URL}/reset-password?token=${token}`;
+    const html = `<!doctype html>
+<html><body style="margin:0;background:#f9fafb;font-family:Arial,Helvetica,sans-serif">
+  <div style="max-width:520px;margin:24px auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:24px">
+    <p style="margin:0 0 16px;font-size:20px;font-weight:bold;color:#111827">Slotly</p>
+    <h1 style="margin:0 0 8px;font-size:20px;color:#111827">Reset your password</h1>
+    <p style="margin:0 0 16px;color:#374151">Hi ${escapeHtml(name)}, we received a request to reset your password. This link works once and expires in 1 hour.</p>
+    <p style="margin:0 0 16px"><a href="${escapeHtml(link)}" style="display:inline-block;background:#111827;color:#ffffff;padding:10px 16px;border-radius:8px;text-decoration:none">Choose a new password</a></p>
+    <p style="margin:0;color:#6b7280;font-size:13px">If you did not ask for this, you can ignore this email; your password will not change.</p>
+  </div>
+</body></html>`;
+    const text = [
+      `Hi ${name},`,
+      "",
+      "We received a request to reset your Slotly password. This link works once and expires in 1 hour:",
+      link,
+      "",
+      "If you did not ask for this, ignore this email.",
+    ].join("\n");
+
+    const { error } = await resend.emails.send({
+      from: env.EMAIL_FROM,
+      to,
+      subject: "Reset your Slotly password",
+      html,
+      text,
+    });
+    if (error) {
+      console.error(`[email] password reset failed: ${error.message}`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("[email] password reset crashed:", err);
+    return false;
+  }
+}
