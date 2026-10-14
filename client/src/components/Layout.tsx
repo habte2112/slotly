@@ -19,6 +19,11 @@ export default function Layout() {
                     Dashboard
                   </Link>
                 )}
+                {user.role === "ADMIN" && (
+                  <Link to="/admin" className="text-gray-700 hover:text-gray-900">
+                    Admin
+                  </Link>
+                )}
                 <Link to="/my-bookings" className="text-gray-700 hover:text-gray-900">
                   My bookings
                 </Link>

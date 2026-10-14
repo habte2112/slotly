@@ -402,4 +402,69 @@ describeDb("Slotly API", () => {
       expect(res.body).toEqual({ due: 0, sent: 0, failed: 0, skipped: 0, emailEnabled: false });
     });
   });
+  
+    describe("admin panel", () => {
+    it("keeps admin endpoints for admins only", async () => {
+      expect((await request(app).get("/api/admin/stats")).status).toBe(401);
+      expect((await request(app).get("/api/admin/stats").set(bearer(customer1Token))).status).toBe(403);
+      expect((await request(app).get("/api/admin/stats").set(bearer(providerToken))).status).toBe(403);
+    });
+
+    it("returns dashboard statistics with one entry per day", async () => {
+      const res = await request(app).get("/api/admin/stats").query({ days: 7 }).set(bearer(adminToken));
+      expect(res.status).toBe(200);
+      expect(res.body.perDay).toHaveLength(7);
+      expect(res.body.totals).toEqual(
+        expect.objectContaining({ bookings: expect.any(Number), revenue: expect.any(Number) }),
+      );
+      expect(res.body.users.customers).toBeGreaterThan(0);
+    });
+
+    it("validates the statistics range", async () => {
+      const res = await request(app).get("/api/admin/stats").query({ days: 3 }).set(bearer(adminToken));
+      expect(res.status).toBe(400);
+    });
+
+    it("lists bookings, services and specialists", async () => {
+      const bookings = await request(app).get("/api/admin/bookings").set(bearer(adminToken));
+      expect(bookings.status).toBe(200);
+      expect(Array.isArray(bookings.body.bookings)).toBe(true);
+
+      const services = await request(app).get("/api/admin/services").set(bearer(adminToken));
+      expect(services.status).toBe(200);
+      expect(services.body.services.length).toBeGreaterThan(0);
+
+      const providers = await request(app).get("/api/admin/providers").set(bearer(adminToken));
+      expect(providers.status).toBe(200);
+      expect(providers.body.providers.some((p: { id: string }) => p.id === providerId)).toBe(true);
+    });
+
+    it("promotes a customer to a specialist who can then use the dashboard", async () => {
+      const address = email("promote");
+      const registered = await request(app)
+        .post("/api/auth/register")
+        .send({ name: "Promote Me", email: address, password: PASSWORD });
+      expect(registered.status).toBe(201);
+
+      const created = await request(app).post("/api/admin/providers").set(bearer(adminToken)).send({ email: address });
+      expect(created.status).toBe(201);
+
+      // ሚናው በ token ውስጥ ስለሆነ እንደገና መግባት ያስፈልጋል
+      const token = await login(address);
+      const me = await request(app).get("/api/provider/me").set(bearer(token));
+      expect(me.status).toBe(200);
+      expect(me.body.workingHours).toHaveLength(5);
+
+      const again = await request(app).post("/api/admin/providers").set(bearer(adminToken)).send({ email: address });
+      expect(again.status).toBe(409);
+    });
+
+    it("refuses to make an admin a specialist and reports unknown emails", async () => {
+      const admin = await request(app).post("/api/admin/providers").set(bearer(adminToken)).send({ email: email("admin") });
+      expect(admin.status).toBe(409);
+      const ghost = await request(app).post("/api/admin/providers").set(bearer(adminToken)).send({ email: email("ghost") });
+      expect(ghost.status).toBe(404);
+    });
+  });
+
 });

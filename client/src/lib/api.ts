@@ -201,3 +201,83 @@ export const resetPassword = (token: string, password: string) =>
     method: "POST",
     body: JSON.stringify({ token, password }),
   });
+
+  // ---- Admin ----
+export interface AdminStats {
+  days: number;
+  from: string;
+  to: string;
+  truncated: boolean;
+  totals: {
+    bookings: number;
+    scheduled: number;
+    completed: number;
+    cancelled: number;
+    revenue: number;
+    cancellationRate: number;
+  };
+  upcoming: number;
+  users: { customers: number; providers: number; admins: number };
+  perDay: { date: string; bookings: number; cancelled: number }[];
+  topServices: { id: string; name: string; bookings: number; revenue: number }[];
+}
+
+export const getAdminStats = (days: number) => request<AdminStats>(`/admin/stats?days=${days}`);
+
+export interface AdminBooking {
+  id: string;
+  startAt: string;
+  endAt: string;
+  status: Booking["status"];
+  customer: { name: string; email: string };
+  provider: { user: { name: string } };
+  service: { name: string };
+}
+
+export const getAdminBookings = (scope: "upcoming" | "past") =>
+  request<{ bookings: AdminBooking[] }>(`/admin/bookings?scope=${scope}`).then((r) => r.bookings);
+
+export interface AdminService extends Service {
+  isActive: boolean;
+}
+
+export const getAdminServices = () =>
+  request<{ services: AdminService[] }>("/admin/services").then((r) => r.services);
+
+export const createService = (input: {
+  name: string;
+  description?: string;
+  durationMinutes: number;
+  price: number;
+}) =>
+  request<{ service: AdminService }>("/services", { method: "POST", body: JSON.stringify(input) }).then(
+    (r) => r.service,
+  );
+
+export const updateService = (id: string, patch: { isActive?: boolean }) =>
+  request<{ service: AdminService }>(`/services/${id}`, { method: "PATCH", body: JSON.stringify(patch) }).then(
+    (r) => r.service,
+  );
+
+export interface AdminProvider {
+  id: string;
+  name: string;
+  email: string;
+  bio: string | null;
+  services: { id: string; name: string }[];
+}
+
+export const getAdminProviders = () =>
+  request<{ providers: AdminProvider[] }>("/admin/providers").then((r) => r.providers);
+
+export const createProviderByEmail = (email: string, bio?: string) =>
+  request<{ provider: { id: string } }>("/admin/providers", {
+    method: "POST",
+    body: JSON.stringify({ email, bio }),
+  });
+
+export const setProviderServices = (id: string, serviceIds: string[]) =>
+  request<{ provider: { id: string } }>(`/providers/${id}/services`, {
+    method: "PUT",
+    body: JSON.stringify({ serviceIds }),
+  });

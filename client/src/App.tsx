@@ -10,25 +10,32 @@ import Dashboard from "./pages/Dashboard";
 import Reschedule from "./pages/Reschedule";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import Admin from "./pages/Admin";
 
 export default function App() {
   return (
-    <Routes>
-      <Route element={<Layout />}>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/book/:serviceId" element={<BookingPage />} />
-        <Route element={<ProtectedRoute />}>
-                <Route element={<ProtectedRoute role="PROVIDER" />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-        </Route>
-          <Route path="/my-bookings" element={<MyBookings />} />
-          <Route path="/reschedule/:id" element={<Reschedule />} />
-        </Route>
+  <Routes>
+    <Route element={<Layout />}>
+      <Route path="/" element={<Home />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/book/:serviceId" element={<BookingPage />} />
+
+      <Route element={<ProtectedRoute />}>
+        <Route path="/my-bookings" element={<MyBookings />} />
+        <Route path="/reschedule/:id" element={<Reschedule />} />
+    </Route>
+
+    <Route element={<ProtectedRoute role="PROVIDER" />}>
+      <Route path="/dashboard" element={<Dashboard />} />
+    </Route>
+
+    <Route element={<ProtectedRoute role="ADMIN" />}>
+      <Route path="/admin" element={<Admin />} />
       </Route>
-    </Routes>
+    </Route>
+  </Routes>
   );
 }

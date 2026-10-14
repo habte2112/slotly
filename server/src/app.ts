@@ -10,6 +10,7 @@ import { providersRouter } from "./routes/providers.routes";
 import { bookingsRouter } from "./routes/bookings.routes";
 import { providerDashboardRouter } from "./routes/provider-dashboard.routes";
 import { internalRouter } from "./routes/internal.routes";
+import { adminRouter } from "./routes/admin.routes";
 
 export const app = express();
 
@@ -37,6 +38,7 @@ app.use("/api/services", servicesRouter);
 app.use("/api/providers", providersRouter);
 app.use("/api/bookings", bookingsRouter);
 app.use("/api/provider", providerDashboardRouter);
+app.use("/api/admin", adminRouter);
 app.use("/api/internal", internalRouter);
 
 // ስህተቶች እዚህ ይያዛሉ (ከራውተሮች በኋላ)
