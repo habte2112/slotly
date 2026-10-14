@@ -65,7 +65,9 @@ export default function MyBookings() {
                 <p className="font-medium text-gray-900">
                   {b.service.name} with {b.provider.user.name}
                 </p>
-                <p className="text-sm text-gray-600">{formatter.format(new Date(b.startAt))}</p>
+                <p className="text-sm text-gray-600">
+                  {formatter.format(new Date(b.startAt))} · {b.priceAtBooking ?? b.service.price} ETB
+                </p>
                 <span className={`mt-2 inline-block rounded-full px-2 py-0.5 text-xs ${statusStyle[b.status]}`}>
                   {b.status.toLowerCase()}
                 </span>

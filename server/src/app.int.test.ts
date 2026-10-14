@@ -34,6 +34,7 @@ const DATE_A = nextMonday(14);
 const DATE_B = addDays(DATE_A, 7);
 const DATE_C = addDays(DATE_A, 14);
 const DATE_D = addDays(DATE_A, 21);
+const DATE_E = addDays(DATE_A, 28);
 
 async function login(address: string, password = PASSWORD): Promise<string> {
   const res = await request(app).post("/api/auth/login").send({ email: address, password });
@@ -221,6 +222,7 @@ describeDb("Slotly API", () => {
       const res = await book(customer1Token, at(DATE_A, "09:00"));
       expect(res.status).toBe(201);
       expect(res.body.booking.status).toBe("CONFIRMED");
+      expect(res.body.booking.priceAtBooking).toBe(100);
       expect(res.body.booking.startAt).toBe(at(DATE_A, "09:00"));
       expect(res.body.booking.endAt).toBe(at(DATE_A, "09:30"));
     });
@@ -464,6 +466,30 @@ describeDb("Slotly API", () => {
       expect(admin.status).toBe(409);
       const ghost = await request(app).post("/api/admin/providers").set(bearer(adminToken)).send({ email: email("ghost") });
       expect(ghost.status).toBe(404);
+    });
+  });
+
+    describe("price at booking", () => {
+    it("keeps the price a customer agreed to when the service price changes later", async () => {
+      const priced = await prisma.service.create({
+        data: { name: `Test price ${tag}`, durationMinutes: 30, price: 100 },
+      });
+      await prisma.providerService.create({ data: { providerId, serviceId: priced.id } });
+
+      const first = await book(customer1Token, at(DATE_E, "09:00"), priced.id);
+      expect(first.status).toBe(201);
+
+      await prisma.service.update({ where: { id: priced.id }, data: { price: 150 } });
+
+      const second = await book(customer2Token, at(DATE_E, "10:00"), priced.id);
+      expect(second.status).toBe(201);
+
+      const rows = await prisma.booking.findMany({
+        where: { serviceId: priced.id },
+        orderBy: { startAt: "asc" },
+        select: { priceAtBooking: true },
+      });
+      expect(rows.map((r) => r.priceAtBooking)).toEqual([100, 150]);
     });
   });
 

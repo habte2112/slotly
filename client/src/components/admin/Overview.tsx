@@ -68,7 +68,7 @@ export default function Overview() {
               value={String(stats.totals.bookings)}
               hint={`${stats.totals.completed} completed · ${stats.totals.scheduled} scheduled`}
             />
-            <Card label="Booked value" value={money(stats.totals.revenue)} hint="At current service prices" />
+            <Card label="Booked value" value={money(stats.totals.revenue)} hint="At the price when booked" />
             <Card
               label="Cancellation rate"
               value={`${(stats.totals.cancellationRate * 100).toFixed(1)}%`}

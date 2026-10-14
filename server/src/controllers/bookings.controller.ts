@@ -34,6 +34,7 @@ const bookingSelect = {
   endAt: true,
   status: true,
   notes: true,
+  priceAtBooking: true,
   provider: { select: { id: true, user: { select: { name: true } } } },
   service: { select: { id: true, name: true, durationMinutes: true, price: true } },
 } as const;
@@ -85,7 +86,15 @@ export async function createBooking(req: AuthRequest, res: Response) {
 
   try {
     const booking = await prisma.booking.create({
-      data: { customerId: req.user!.id, providerId, serviceId, startAt, endAt, notes },
+      data: {
+        customerId: req.user!.id,
+        providerId,
+        serviceId,
+        startAt,
+        endAt,
+        notes,
+        priceAtBooking: availability.service.price,
+      },
       select: bookingSelect,
     });
     res.status(201).json({ booking });

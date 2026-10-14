@@ -37,6 +37,7 @@ export interface Booking {
   endAt: string;
   status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
   notes: string | null;
+  priceAtBooking: number | null;
   provider: { id: string; user: { name: string } };
   service: ServiceSummary;
 }

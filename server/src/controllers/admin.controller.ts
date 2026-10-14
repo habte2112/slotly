@@ -33,6 +33,7 @@ export async function getStats(req: Request, res: Response) {
         startAt: true,
         status: true,
         serviceId: true,
+        priceAtBooking: true,
         service: { select: { name: true, price: true } },
       },
       take: MAX_ROWS,
@@ -65,11 +66,12 @@ export async function getStats(req: Request, res: Response) {
     if (day) day.bookings++;
     if (b.status === "COMPLETED") completed++;
     else scheduled++;
-    revenue += b.service.price;
+    const price = b.priceAtBooking ?? b.service.price;
+    revenue += price;
 
     const entry = services.get(b.serviceId) ?? { id: b.serviceId, name: b.service.name, bookings: 0, revenue: 0 };
     entry.bookings++;
-    entry.revenue += b.service.price;
+    entry.revenue += price;
     services.set(b.serviceId, entry);
   }
 
