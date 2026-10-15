@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ApiError,
@@ -11,10 +11,43 @@ import {
   type Slot,
 } from "../lib/api";
 import { useAuth } from "../context/auth-context";
+import Avatar from "../components/ui/Avatar";
+import ServiceIcon from "../components/ui/ServiceIcon";
+import Skeleton from "../components/ui/Skeleton";
 
 // የአዲስ አበባ የዛሬ ቀን (UTC+3)
 function todayInAddis(): string {
   return new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function prettyDate(date: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "UTC",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(`${date}T12:00:00Z`));
+}
+
+const PARTS = [
+  { label: "Morning", match: (h: number) => h < 12 },
+  { label: "Afternoon", match: (h: number) => h >= 12 && h < 17 },
+  { label: "Evening", match: (h: number) => h >= 17 },
+];
+
+// label ሁልጊዜ "HH:MM" የአዲስ አበባ ሰዓት ነው
+const hourOf = (slot: Slot) => parseInt(slot.label.slice(0, 2), 10);
+
+function StepTitle({ n, children }: { n: number; children: ReactNode }) {
+  return (
+    <h2 className="flex items-center gap-3 font-semibold text-slate-900">
+      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-700 text-sm text-white">
+        {n}
+      </span>
+      {children}
+    </h2>
+  );
 }
 
 export default function BookingPage() {
@@ -119,10 +152,23 @@ export default function BookingPage() {
   }
 
   if (loadError) return <p className="text-red-600">{loadError}</p>;
-  if (!providers) return <p className="text-gray-500">Loading...</p>;
+
+  if (!providers) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-5 w-32" />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+        </div>
+      </div>
+    );
+  }
+
   if (!service) {
     return (
-      <p className="text-gray-700">
+      <p className="text-slate-700">
         Service not found.{" "}
         <Link to="/" className="underline">
           Back to services
@@ -131,32 +177,46 @@ export default function BookingPage() {
     );
   }
 
+  const provider = providers.find((p) => p.id === providerId);
+
   return (
     <div className="space-y-8">
       <div>
-        <Link to="/" className="text-sm text-gray-500 hover:text-gray-900">
+        <Link to="/" className="text-sm text-slate-500 hover:text-slate-900">
           ← All services
         </Link>
-        <h1 className="mt-2 text-3xl font-bold text-gray-900">{service.name}</h1>
-        <p className="text-gray-600">
-          {service.durationMinutes} min · {service.price} ETB
-        </p>
+        <div className="mt-3 flex items-center gap-4">
+          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+            <ServiceIcon name={service.name} className="h-7 w-7" />
+          </span>
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">{service.name}</h1>
+            <p className="text-slate-600">
+              {service.durationMinutes} min · {service.price} ETB
+            </p>
+          </div>
+        </div>
       </div>
 
       <section>
-        <h2 className="font-semibold text-gray-900">1. Choose a specialist</h2>
-        {providers.length === 0 && <p className="mt-2 text-gray-500">No specialists offer this service yet.</p>}
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <StepTitle n={1}>Choose a specialist</StepTitle>
+        {providers.length === 0 && <p className="mt-3 text-slate-500">No specialists offer this service yet.</p>}
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
           {providers.map((p) => (
             <button
               key={p.id}
               onClick={() => chooseProvider(p.id)}
-              className={`rounded-xl border p-4 text-left ${
-                providerId === p.id ? "border-gray-900 bg-gray-100" : "border-gray-200 bg-white hover:border-gray-400"
+              className={`flex items-start gap-3 rounded-2xl border p-4 text-left transition ${
+                providerId === p.id
+                  ? "border-brand-600 bg-brand-50 ring-1 ring-brand-600"
+                  : "border-slate-200 bg-white hover:border-brand-300"
               }`}
             >
-              <p className="font-medium text-gray-900">{p.name}</p>
-              <p className="mt-1 text-sm text-gray-600">{p.bio}</p>
+              <Avatar name={p.name} className="h-11 w-11 text-base" />
+              <span>
+                <span className="block font-medium text-slate-900">{p.name}</span>
+                <span className="mt-0.5 block text-sm text-slate-600">{p.bio}</span>
+              </span>
             </button>
           ))}
         </div>
@@ -164,61 +224,101 @@ export default function BookingPage() {
 
       {providerId && (
         <section>
-          <h2 className="font-semibold text-gray-900">2. Choose a date</h2>
+          <StepTitle n={2}>Choose a date</StepTitle>
           <input
             type="date"
             value={date}
             min={todayInAddis()}
             onChange={(e) => chooseDate(e.target.value)}
-            className="mt-3 rounded-lg border border-gray-300 p-2"
+            className="mt-4 rounded-lg border border-slate-300 bg-white p-2"
           />
         </section>
       )}
 
       {providerId && (
         <section>
-          <h2 className="font-semibold text-gray-900">3. Choose a time</h2>
-          {slots === null && <p className="mt-2 text-gray-500">Loading times...</p>}
-          {slots?.length === 0 && (
-            <p className="mt-2 text-gray-500">No free times on this day. Try another date.</p>
+          <StepTitle n={3}>Choose a time</StepTitle>
+
+          {slots === null && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {Array.from({ length: 8 }, (_, i) => (
+                <Skeleton key={i} className="h-10 w-20" />
+              ))}
+            </div>
           )}
-          <div className="mt-3 flex flex-wrap gap-2">
-            {slots?.map((s) => (
-              <button
-                key={s.start}
-                onClick={() => setSelected(s)}
-                className={`rounded-lg border px-3 py-2 text-sm ${
-                  selected?.start === s.start
-                    ? "border-gray-900 bg-gray-900 text-white"
-                    : "border-gray-300 bg-white hover:border-gray-500"
-                }`}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
+
+          {slots?.length === 0 && (
+            <p className="mt-4 rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-600">
+              No free times on this day. Try another date.
+            </p>
+          )}
+
+          {slots && slots.length > 0 && (
+            <div className="mt-4 space-y-4">
+              {PARTS.map((part) => {
+                const inPart = slots.filter((s) => part.match(hourOf(s)));
+                if (inPart.length === 0) return null;
+                return (
+                  <div key={part.label}>
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">{part.label}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {inPart.map((s) => (
+                        <button
+                          key={s.start}
+                          onClick={() => setSelected(s)}
+                          className={`rounded-lg border px-3 py-2 text-sm transition ${
+                            selected?.start === s.start
+                              ? "border-brand-700 bg-brand-700 text-white"
+                              : "border-slate-300 bg-white text-slate-800 hover:border-brand-600 hover:text-brand-700"
+                          }`}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </section>
       )}
 
       {selected && (
-        <section className="rounded-xl border border-gray-200 bg-white p-4">
-          <h2 className="font-semibold text-gray-900">4. Confirm</h2>
-          <p className="mt-2 text-gray-700">
-            {service.name} on <span className="font-medium">{date}</span> at{" "}
-            <span className="font-medium">{selected.label}</span>
-          </p>
+        <section className="rounded-2xl border border-brand-200 bg-brand-50 p-5">
+          <StepTitle n={4}>Confirm</StepTitle>
+          <dl className="mt-4 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-slate-500">Service</dt>
+              <dd className="font-medium text-slate-900">{service.name}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">Specialist</dt>
+              <dd className="font-medium text-slate-900">{provider?.name}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">When</dt>
+              <dd className="font-medium text-slate-900">
+                {prettyDate(date)} at {selected.label}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">Price</dt>
+              <dd className="font-medium text-slate-900">{service.price} ETB</dd>
+            </div>
+          </dl>
           <textarea
             placeholder="Notes (optional)"
             maxLength={500}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="mt-3 w-full rounded-lg border border-gray-300 p-2"
+            className="mt-4 w-full rounded-lg border border-slate-300 bg-white p-2"
             rows={2}
           />
           <button
             onClick={confirm}
             disabled={submitting}
-            className="mt-3 rounded-lg bg-gray-900 px-4 py-2 text-white hover:bg-gray-700 disabled:opacity-50"
+            className="mt-3 rounded-lg bg-brand-700 px-5 py-2.5 font-medium text-white hover:bg-brand-800 disabled:opacity-50"
           >
             {submitting ? "Booking..." : user ? "Confirm booking" : "Log in to confirm"}
           </button>

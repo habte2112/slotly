@@ -62,7 +62,7 @@ export default function ProviderBookings() {
             key={s}
             onClick={() => changeScope(s)}
             className={`rounded-lg border px-3 py-1 text-sm capitalize ${
-              scope === s ? "border-gray-900 bg-gray-900 text-white" : "border-gray-300 bg-white hover:bg-gray-100"
+              scope === s ? "border-brand-700 bg-brand-700 text-white" : "border-gray-300 bg-white hover:bg-gray-100"
             }`}
           >
             {s}

@@ -25,7 +25,7 @@ export default function Admin() {
             onClick={() => setTab(t.id)}
             className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm ${
               tab === t.id
-                ? "border-gray-900 font-medium text-gray-900"
+                ? "border-brand-700 font-medium text-gray-900"
                 : "border-transparent text-gray-500 hover:text-gray-900"
             }`}
           >

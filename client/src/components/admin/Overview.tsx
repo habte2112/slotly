@@ -49,7 +49,7 @@ export default function Overview() {
             key={d}
             onClick={() => changeDays(d)}
             className={`rounded-lg border px-3 py-1 text-sm ${
-              days === d ? "border-gray-900 bg-gray-900 text-white" : "border-gray-300 bg-white hover:bg-gray-100"
+              days === d ? "border-brand-700 bg-brand-700 text-white" : "border-gray-300 bg-white hover:bg-gray-100"
             }`}
           >
             Last {d} days
@@ -102,7 +102,7 @@ export default function Overview() {
                       </span>
                     </div>
                     <div className="mt-1 h-2 rounded bg-gray-100">
-                      <div className="h-2 rounded bg-gray-900" style={{ width: `${(s.bookings / topMax) * 100}%` }} />
+                      <div className="h-2 rounded bg-brand-700" style={{ width: `${(s.bookings / topMax) * 100}%` }} />
                     </div>
                   </li>
                 ))}

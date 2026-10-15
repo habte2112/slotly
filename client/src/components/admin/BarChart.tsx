@@ -17,7 +17,7 @@ export default function BarChart({ data }: { data: Point[] }) {
             className="flex h-full flex-1 flex-col justify-end"
           >
             <div className="bg-red-300" style={{ height: `${(d.cancelled / max) * 100}%` }} />
-            <div className="bg-gray-900" style={{ height: `${(d.bookings / max) * 100}%` }} />
+            <div className="bg-brand-700" style={{ height: `${(d.bookings / max) * 100}%` }} />
           </div>
         ))}
       </div>
@@ -27,7 +27,7 @@ export default function BarChart({ data }: { data: Point[] }) {
       </div>
       <div className="mt-2 flex gap-4 text-xs text-gray-600">
         <span className="flex items-center gap-1">
-          <span className="inline-block h-2 w-2 bg-gray-900" /> Booked
+          <span className="inline-block h-2 w-2 bg-brand-700" /> Booked
         </span>
         <span className="flex items-center gap-1">
           <span className="inline-block h-2 w-2 bg-red-300" /> Cancelled

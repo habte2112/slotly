@@ -1,44 +1,163 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getServices, type Service } from "../lib/api";
+import ServiceIcon from "../components/ui/ServiceIcon";
+import Skeleton from "../components/ui/Skeleton";
+
+const STEPS = [
+  { title: "Choose a service", text: "Browse what is on offer and pick what you need." },
+  { title: "Pick a specialist and time", text: "See the real free times and choose the one that suits you." },
+  { title: "Get your confirmation", text: "An email arrives right away, with a link to add it to your calendar." },
+];
 
 export default function Home() {
   const [services, setServices] = useState<Service[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [slow, setSlow] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
     getServices()
-      .then(setServices)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, []);
+      .then((s) => {
+        if (!cancelled) setServices(s);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e.message);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+          setSlow(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
+
+  // ነጻው የ hosting ዕቅድ ሲተኛ መጀመሪያው ጥያቄ ረጅም ጊዜ ይወስዳል
+  useEffect(() => {
+    if (!loading) return;
+    const timer = setTimeout(() => setSlow(true), 4000);
+    return () => clearTimeout(timer);
+  }, [loading]);
+
+  function retry() {
+    setError("");
+    setLoading(true);
+    setReloadKey((k) => k + 1);
+  }
 
   return (
     <>
-      <h1 className="text-3xl font-bold text-gray-900">Book your appointment</h1>
-      <p className="mt-1 text-gray-600">Choose a service to get started.</p>
-
-      {loading && <p className="mt-6 text-gray-500">Loading services...</p>}
-      {error && <p className="mt-6 text-red-600">{error}</p>}
-
-      <ul className="mt-6 grid gap-4 sm:grid-cols-2">
-        {services.map((s) => (
-          <li key={s.id} className="flex flex-col rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <h2 className="font-semibold text-gray-900">{s.name}</h2>
-            <p className="mt-1 text-sm text-gray-600">{s.description}</p>
-            <p className="mt-3 text-sm text-gray-700">
-              {s.durationMinutes} min · <span className="font-medium">{s.price} ETB</span>
-            </p>
+      <section className="relative overflow-hidden rounded-2xl bg-brand-800 px-6 py-12 text-white sm:px-10 sm:py-16">
+        <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-brand-600/40" />
+        <div className="pointer-events-none absolute -bottom-24 right-24 h-56 w-56 rounded-full bg-brand-900/60" />
+        <div className="relative">
+          <p className="text-sm font-medium uppercase tracking-wide text-brand-200">Online booking</p>
+          <h1 className="mt-2 max-w-xl text-3xl font-bold leading-tight sm:text-5xl">
+            Book your next appointment in seconds
+          </h1>
+          <p className="mt-4 max-w-xl text-brand-100">
+            Choose a service, pick a specialist and grab a free time slot. No phone calls, no waiting.
+          </p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <a href="#services" className="rounded-lg bg-white px-5 py-3 font-medium text-brand-800 hover:bg-brand-50">
+              Browse services
+            </a>
             <Link
-              to={`/book/${s.id}`}
-              className="mt-4 rounded-lg bg-gray-900 px-3 py-2 text-center text-sm text-white hover:bg-gray-700"
+              to="/register"
+              className="rounded-lg border border-white/40 px-5 py-3 font-medium text-white hover:bg-white/10"
             >
-              Book now
+              Create an account
             </Link>
-          </li>
-        ))}
-      </ul>
+          </div>
+          <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-brand-100">
+            <li>✓ Live availability</li>
+            <li>✓ Email confirmation</li>
+            <li>✓ Add to your calendar</li>
+            <li>✓ Reschedule or cancel anytime</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="services" className="mt-12 scroll-mt-20">
+        <h2 className="text-2xl font-bold text-slate-900">Our services</h2>
+        <p className="mt-1 text-slate-600">Pick one to see who is available.</p>
+
+        {loading && slow && (
+          <p className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Waking up the demo server. This can take up to a minute on the free hosting tier.
+          </p>
+        )}
+
+        {error && !loading && (
+          <div className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}{" "}
+            <button onClick={retry} className="font-medium underline">
+              Try again
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && services.length === 0 && (
+          <p className="mt-6 text-slate-600">No services are available right now.</p>
+        )}
+
+        <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {loading &&
+            [0, 1, 2].map((i) => (
+              <li key={i} className="rounded-2xl border border-slate-200 bg-white p-5">
+                <Skeleton className="h-11 w-11" />
+                <Skeleton className="mt-4 h-5 w-32" />
+                <Skeleton className="mt-2 h-4 w-full" />
+                <Skeleton className="mt-6 h-10 w-full" />
+              </li>
+            ))}
+
+          {services.map((s) => (
+            <li
+              key={s.id}
+              className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+                <ServiceIcon name={s.name} />
+              </span>
+              <h3 className="mt-4 font-semibold text-slate-900">{s.name}</h3>
+              <p className="mt-1 flex-1 text-sm text-slate-600">{s.description}</p>
+              <div className="mt-4 flex items-center justify-between text-sm">
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">{s.durationMinutes} min</span>
+                <span className="font-semibold text-slate-900">{s.price} ETB</span>
+              </div>
+              <Link
+                to={`/book/${s.id}`}
+                className="mt-4 rounded-lg bg-brand-700 px-3 py-2 text-center text-sm font-medium text-white hover:bg-brand-800"
+              >
+                Book now
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="mt-14">
+        <h2 className="text-2xl font-bold text-slate-900">How it works</h2>
+        <ol className="mt-6 grid gap-6 sm:grid-cols-3">
+          {STEPS.map((step, i) => (
+            <li key={step.title} className="flex gap-4">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-700 font-semibold text-white">
+                {i + 1}
+              </span>
+              <div>
+                <h3 className="font-semibold text-slate-900">{step.title}</h3>
+                <p className="mt-1 text-sm text-slate-600">{step.text}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
     </>
   );
 }

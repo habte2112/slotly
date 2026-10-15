@@ -146,7 +146,7 @@ export default function Reschedule() {
               onClick={() => setSelected(s)}
               className={`rounded-lg border px-3 py-2 text-sm ${
                 selected?.start === s.start
-                  ? "border-gray-900 bg-gray-900 text-white"
+                  ? "border-brand-700 bg-brand-700 text-white"
                   : "border-gray-300 bg-white hover:border-gray-500"
               }`}
             >
@@ -160,7 +160,7 @@ export default function Reschedule() {
         <button
           onClick={confirm}
           disabled={submitting}
-          className="rounded-lg bg-gray-900 px-4 py-2 text-white hover:bg-gray-700 disabled:opacity-50"
+          className="rounded-lg bg-brand-700 px-4 py-2 text-white hover:bg-brand-800 disabled:opacity-50"
         >
           {submitting ? "Saving..." : `Move to ${date} at ${selected.label}`}
         </button>

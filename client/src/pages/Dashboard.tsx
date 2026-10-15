@@ -22,7 +22,7 @@ export default function Dashboard() {
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`-mb-px border-b-2 px-3 py-2 text-sm ${
-              tab === t.id ? "border-gray-900 font-medium text-gray-900" : "border-transparent text-gray-500 hover:text-gray-900"
+              tab === t.id ? "border-brand-700 font-medium text-gray-900" : "border-transparent text-gray-500 hover:text-gray-900"
             }`}
           >
             {t.label}

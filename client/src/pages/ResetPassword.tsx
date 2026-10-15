@@ -47,7 +47,7 @@ export default function ResetPassword() {
       <div className="mx-auto max-w-sm">
         <h1 className="text-2xl font-bold text-gray-900">Password updated</h1>
         <p className="mt-3 text-gray-600">You can now log in with your new password.</p>
-        <Link to="/login" className="mt-4 inline-block rounded-lg bg-gray-900 px-4 py-2 text-white hover:bg-gray-700">
+        <Link to="/login" className="mt-4 inline-block rounded-lg bg-brand-700 px-4 py-2 text-white hover:bg-brand-800">
           Log in
         </Link>
       </div>
@@ -89,7 +89,7 @@ export default function ResetPassword() {
         <button
           type="submit"
           disabled={submitting}
-          className="w-full rounded-lg bg-gray-900 p-2 text-white hover:bg-gray-700 disabled:opacity-50"
+          className="w-full rounded-lg bg-brand-700 p-2 text-white hover:bg-brand-800 disabled:opacity-50"
         >
           {submitting ? "Saving..." : "Update password"}
         </button>
