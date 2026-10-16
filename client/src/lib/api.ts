@@ -282,3 +282,17 @@ export const setProviderServices = (id: string, serviceIds: string[]) =>
     method: "PUT",
     body: JSON.stringify({ serviceIds }),
   });
+
+  // ---- Telegram ----
+export interface TelegramStatus {
+  enabled: boolean;
+  linked: boolean;
+  botUsername: string | null;
+}
+
+export const getTelegramStatus = () => request<TelegramStatus>("/telegram/status");
+
+export const createTelegramLink = () =>
+  request<{ url: string }>("/telegram/link", { method: "POST" }).then((r) => r.url);
+
+export const unlinkTelegram = () => request<{ success: boolean }>("/telegram/link", { method: "DELETE" });

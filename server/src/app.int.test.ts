@@ -35,6 +35,7 @@ const DATE_B = addDays(DATE_A, 7);
 const DATE_C = addDays(DATE_A, 14);
 const DATE_D = addDays(DATE_A, 21);
 const DATE_E = addDays(DATE_A, 28);
+const DATE_F = addDays(DATE_A, 35);
 
 async function login(address: string, password = PASSWORD): Promise<string> {
   const res = await request(app).post("/api/auth/login").send({ email: address, password });
@@ -398,10 +399,11 @@ describeDb("Slotly API", () => {
       expect((await request(app).post("/api/internal/send-reminders").set(bearer("wrong-secret"))).status).toBe(401);
     });
 
-    it("accepts the secret and reports that email is disabled in tests", async () => {
+    it("accepts the secret and reports which channels are enabled", async () => {
       const res = await request(app).post("/api/internal/send-reminders").set(bearer(process.env.CRON_SECRET!));
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ due: 0, sent: 0, failed: 0, skipped: 0, emailEnabled: false });
+      expect(res.body).toMatchObject({ emailEnabled: false, telegramEnabled: true });
+      expect(res.body.due).toEqual(expect.any(Number));
     });
   });
   
@@ -469,7 +471,7 @@ describeDb("Slotly API", () => {
     });
   });
 
-    describe("price at booking", () => {
+  describe("price at booking", () => {
     it("keeps the price a customer agreed to when the service price changes later", async () => {
       const priced = await prisma.service.create({
         data: { name: `Test price ${tag}`, durationMinutes: 30, price: 100 },
@@ -491,6 +493,124 @@ describeDb("Slotly API", () => {
       });
       expect(rows.map((r) => r.priceAtBooking)).toEqual([100, 150]);
     });
+
+  describe("telegram notifications", () => {
+    const chatId = 700_000_000 + Math.floor(Math.random() * 90_000_000);
+    const sent: { method: string; body: Record<string, any> }[] = [];
+    let linkPayload = "";
+
+    beforeAll(() => {
+      // ወደ Telegram የሚሄዱ ጥሪዎች ይመሰላሉ፤ supertest fetch አይጠቀምም
+      vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+        const method = String(input).split("/").pop() ?? "";
+        sent.push({ method, body: JSON.parse(String(init?.body ?? "{}")) });
+        return new Response(JSON.stringify({ ok: true, result: {} }), { status: 200 });
+      });
+    });
+
+    afterAll(() => {
+      vi.restoreAllMocks();
+    });
+
+    const update = (text: string, fromChat = chatId) => ({
+      update_id: Math.floor(Math.random() * 1e9),
+      message: { message_id: 1, chat: { id: fromChat, type: "private" }, text },
+    });
+
+    const webhook = (body: object, secret = process.env.TELEGRAM_WEBHOOK_SECRET!) =>
+      request(app).post("/api/telegram/webhook").set("x-telegram-bot-api-secret-token", secret).send(body);
+
+    const messageTo = (chat: number, includes: string) =>
+      sent.find(
+        (m) =>
+          m.method === "sendMessage" &&
+          String(m.body.chat_id) === String(chat) &&
+          String(m.body.text).toLowerCase().includes(includes.toLowerCase()),
+      );
+
+    it("requires login to create a link", async () => {
+      expect((await request(app).post("/api/telegram/link")).status).toBe(401);
+    });
+
+    it("rejects webhook calls without the right secret", async () => {
+      expect((await request(app).post("/api/telegram/webhook").send(update("/help"))).status).toBe(401);
+      expect((await webhook(update("/help"), "x".repeat(40))).status).toBe(401);
+    });
+
+    it("connects a chat with a one-time link", async () => {
+      const created = await request(app).post("/api/telegram/link").set(bearer(customer1Token));
+      expect(created.status).toBe(200);
+      expect(created.body.url).toMatch(/^https:\/\/t\.me\/slotly_test_bot\?start=[A-Za-z0-9_-]{32}$/);
+      linkPayload = new URL(created.body.url).searchParams.get("start")!;
+
+      expect((await webhook(update(`/start ${linkPayload}`))).status).toBe(200);
+
+      const user = await prisma.user.findUniqueOrThrow({ where: { email: email("customer1") } });
+      await vi.waitFor(
+        async () => {
+          const fresh = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+          expect(fresh.telegramChatId).toBe(String(chatId));
+        },
+        { timeout: 10000, interval: 250 },
+      );
+      await vi.waitFor(() => expect(messageTo(chatId, "connected")).toBeTruthy(), { timeout: 10000, interval: 250 });
+
+      const status = await request(app).get("/api/telegram/status").set(bearer(customer1Token));
+      expect(status.body).toMatchObject({ enabled: true, linked: true, botUsername: "slotly_test_bot" });
+    });
+
+    it("treats the link as single-use", async () => {
+      const otherChat = chatId + 1;
+      expect((await webhook(update(`/start ${linkPayload}`, otherChat))).status).toBe(200);
+      await vi.waitFor(() => expect(messageTo(otherChat, "expired")).toBeTruthy(), { timeout: 10000, interval: 250 });
+
+      const user = await prisma.user.findUniqueOrThrow({ where: { email: email("customer1") } });
+      expect(user.telegramChatId).toBe(String(chatId));
+    });
+
+    it("notifies a linked customer about a new booking", async () => {
+      const res = await book(customer1Token, at(DATE_F, "09:00"));
+      expect(res.status).toBe(201);
+      await vi.waitFor(() => expect(messageTo(chatId, "Booking confirmed")).toBeTruthy(), {
+        timeout: 10000,
+        interval: 250,
+      });
+      const note = messageTo(chatId, "Booking confirmed")!;
+      expect(JSON.stringify(note.body.reply_markup)).toContain("calendar.google.com");
+    });
+
+    it("answers /bookings and /cancel in the chat", async () => {
+      expect((await webhook(update("/bookings"))).status).toBe(200);
+      await vi.waitFor(() => expect(messageTo(chatId, "Your upcoming bookings")).toBeTruthy(), {
+        timeout: 10000,
+        interval: 250,
+      });
+
+      expect((await webhook(update("/cancel"))).status).toBe(200);
+      await vi.waitFor(
+        () => {
+          const menu = sent.find(
+            (m) =>
+              m.method === "sendMessage" &&
+              String(m.body.chat_id) === String(chatId) &&
+              Array.isArray(m.body.reply_markup?.inline_keyboard) &&
+              m.body.reply_markup.inline_keyboard.some((row: { callback_data?: string }[]) =>
+                row[0]?.callback_data?.startsWith("c:"),
+              ),
+          );
+          expect(menu).toBeTruthy();
+        },
+        { timeout: 10000, interval: 250 },
+      );
+    });
+
+    it("disconnects the chat", async () => {
+      const res = await request(app).delete("/api/telegram/link").set(bearer(customer1Token));
+      expect(res.status).toBe(200);
+      const status = await request(app).get("/api/telegram/status").set(bearer(customer1Token));
+      expect(status.body.linked).toBe(false);
+    });
+  });
   });
 
 });

@@ -3,6 +3,7 @@ import { Resend } from "resend";
 import { env } from "../config/env";
 import { prisma } from "../lib/prisma";
 import { buildIcs, googleCalendarUrl } from "./calendar";
+import { sendBookingTelegram, telegramEnabled } from "./telegram.service";
 
 export type BookingEmailKind =
   | "confirmed"
@@ -303,53 +304,29 @@ export async function sendBookingEmail(
   }
 }
 
-// Send the email without waiting; email failure does not break the booking flow.
-export function notifyBooking(
-  kind: BookingEmailKind,
-  bookingId: string
-): void {
+// ምላሹን ሳይጠብቅ ኢሜይል እና Telegram ይልካል (ቢከሽፉ ቀጠሮው አይሰበርም)
+export function notifyBooking(kind: BookingEmailKind, bookingId: string): void {
   void sendBookingEmail(kind, bookingId);
+  void sendBookingTelegram(kind, bookingId);
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export async function processReminders(
-  minAgeMinutes = 120,
-  now = new Date()
-) {
-  if (!emailEnabled) {
-    return {
-      due: 0,
-      sent: 0,
-      failed: 0,
-      skipped: 0,
-      emailEnabled: false,
-    };
+export async function processReminders(minAgeMinutes = 120, now = new Date()) {
+  if (!emailEnabled && !telegramEnabled) {
+    return { due: 0, sent: 0, failed: 0, skipped: 0, emailEnabled, telegramEnabled };
   }
 
   const due = await prisma.booking.findMany({
     where: {
-      status: {
-        in: ["PENDING", "CONFIRMED"],
-      },
+      status: { in: ["PENDING", "CONFIRMED"] },
       reminderSentAt: null,
-      startAt: {
-        gt: now,
-        lte: new Date(now.getTime() + DAY_MS),
-      },
-      // Prevent reminders immediately after a booking is created.
-      createdAt: {
-        lt: new Date(
-          now.getTime() - minAgeMinutes * 60 * 1000
-        ),
-      },
+      startAt: { gt: now, lte: new Date(now.getTime() + DAY_MS) },
+      // ገና የተያዘ ቀጠሮ ወዲያው ማሳሰቢያ እንዳያገኝ
+      createdAt: { lt: new Date(now.getTime() - minAgeMinutes * 60 * 1000) },
     },
-    orderBy: {
-      startAt: "asc",
-    },
-    select: {
-      id: true,
-    },
+    orderBy: { startAt: "asc" },
+    select: { id: true },
     take: 50,
   });
 
@@ -358,37 +335,24 @@ export async function processReminders(
   let skipped = 0;
 
   for (const { id } of due) {
-    // Claim the reminder before sending to reduce duplicate emails.
+    // ከመላኩ በፊት "ይያዛል"፣ ስለዚህ ሁለት ጊዜ ቢጠራም አንድ ማሳሰቢያ ብቻ ይሄዳል
     const claim = await prisma.booking.updateMany({
-      where: {
-        id,
-        reminderSentAt: null,
-      },
-      data: {
-        reminderSentAt: now,
-      },
+      where: { id, reminderSentAt: null },
+      data: { reminderSentAt: now },
     });
-
     if (claim.count === 0) {
       skipped++;
       continue;
     }
-
-    if (await sendBookingEmail("reminder", id)) {
-      sent++;
-    } else {
-      failed++;
-      // A failed reminder is not retried by this implementation.
-    }
+    const [emailOk, telegramOk] = await Promise.all([
+      sendBookingEmail("reminder", id),
+      sendBookingTelegram("reminder", id),
+    ]);
+    if (emailOk || telegramOk) sent++;
+    else failed++; // አይደገምም (ለዘላለም እንዳይሞክር)፤ በ logs ውስጥ ይታያል
   }
 
-  return {
-    due: due.length,
-    sent,
-    failed,
-    skipped,
-    emailEnabled: true,
-  };
+  return { due: due.length, sent, failed, skipped, emailEnabled, telegramEnabled };
 }
 
 // Do not print the token or reset link in logs.

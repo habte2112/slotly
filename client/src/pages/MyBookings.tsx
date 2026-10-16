@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { cancelBooking, getMyBookings, type Booking } from "../lib/api";
 import Skeleton from "../components/ui/Skeleton";
+import TelegramCard from "../components/TelegramCard";
 
 const TZ = "Africa/Addis_Ababa";
 const dayFmt = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, day: "numeric" });
@@ -103,6 +104,7 @@ export default function MyBookings() {
   return (
     <>
       <h1 className="text-3xl font-bold text-slate-900">My bookings</h1>
+            <TelegramCard />
 
       {error && <p className="mt-4 text-red-600">{error}</p>}
 

@@ -11,6 +11,7 @@ import { bookingsRouter } from "./routes/bookings.routes";
 import { providerDashboardRouter } from "./routes/provider-dashboard.routes";
 import { internalRouter } from "./routes/internal.routes";
 import { adminRouter } from "./routes/admin.routes";
+import { telegramRouter, telegramWebhookRouter } from "./routes/telegram.routes";
 
 export const app = express();
 
@@ -24,6 +25,10 @@ app.use(
     origin: env.CORS_ORIGIN ? env.CORS_ORIGIN.split(",").map((s) => s.trim()) : false,
   }),
 );
+
+// የ Telegram ዝመናዎች ከ 10 KB ሊበልጡ ስለሚችሉ ይህ መንገድ የራሱ ገደብ አለው
+app.use("/api/telegram/webhook", express.json({ limit: "100kb" }), telegramWebhookRouter);
+
 app.use(express.json({ limit: "10kb" }));
 
 app.get("/api/health", async (_req, res) => {
@@ -38,8 +43,9 @@ app.use("/api/services", servicesRouter);
 app.use("/api/providers", providersRouter);
 app.use("/api/bookings", bookingsRouter);
 app.use("/api/provider", providerDashboardRouter);
-app.use("/api/admin", adminRouter);
 app.use("/api/internal", internalRouter);
+app.use("/api/admin", adminRouter);
+app.use("/api/telegram", telegramRouter);
 
 // ስህተቶች እዚህ ይያዛሉ (ከራውተሮች በኋላ)
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
