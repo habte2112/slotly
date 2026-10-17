@@ -20,6 +20,10 @@ function todayInAddis(): string {
   return new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
+function maxDateInAddis(): string {
+  return new Date(Date.now() + 3 * 60 * 60 * 1000 + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
 function prettyDate(date: string): string {
   return new Intl.DateTimeFormat("en-GB", {
     timeZone: "UTC",
@@ -229,6 +233,7 @@ export default function BookingPage() {
             type="date"
             value={date}
             min={todayInAddis()}
+            max={maxDateInAddis()}
             onChange={(e) => chooseDate(e.target.value)}
             className="mt-4 rounded-lg border border-slate-300 bg-white p-2"
           />

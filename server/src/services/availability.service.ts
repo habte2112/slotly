@@ -1,6 +1,9 @@
 import { prisma } from "../lib/prisma";
 import { computeAvailableSlots, dayBoundsUtc, dayOfWeek } from "./availability";
 
+// ቀጠሮ ከዛሬ ጀምሮ እስከ ስንት ቀን ወደፊት ሊያዝ እንደሚችል
+export const MAX_DAYS_AHEAD = 90;
+
 export async function loadAvailability(
   providerId: string,
   serviceId: string,
@@ -14,6 +17,11 @@ export async function loadAvailability(
   if (!offering || !offering.service.isActive) return null;
 
   const { start: dayStart, end: dayEnd } = dayBoundsUtc(date);
+
+    // ከገደቡ ያለፈ ቀን ባዶ ዝርዝር ይመልሳል፣ ስለዚህ ማስያዝም ማዛወርም አይቻልም
+  if (dayStart.getTime() > Date.now() + MAX_DAYS_AHEAD * 24 * 60 * 60 * 1000) {
+    return { service: offering.service, slots: [] };
+  }
 
   const [workingHours, bookings, timeOff] = await Promise.all([
     prisma.workingHour.findMany({ where: { providerId, dayOfWeek: dayOfWeek(date) } }),

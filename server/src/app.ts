@@ -52,6 +52,11 @@ app.use("/api/internal", internalRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/telegram", telegramRouter);
 
+// የማይታወቅ /api መንገድ JSON ይመልሳል
+app.use("/api", (_req, res) => {
+  res.status(404).json({ message: "Not found" });
+});
+
 // ስህተቶች እዚህ ይያዛሉ (ከራውተሮች በኋላ)
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   const status =

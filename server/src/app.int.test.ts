@@ -114,6 +114,11 @@ describeDb("Slotly API", () => {
       expect(res.status).toBe(200);
       expect(res.body).toMatchObject({ status: "ok", db: "connected" });
     });
+    it("returns JSON for unknown API routes", async () => {
+      const res = await request(app).get("/api/does-not-exist");
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ message: "Not found" });
+    });
     it("answers /api/ping without touching the database", async () => {
       const res = await request(app).get("/api/ping");
       expect(res.status).toBe(200);
@@ -214,6 +219,13 @@ describeDb("Slotly API", () => {
     it("validates the query", async () => {
       expect((await availability("2026-02-30")).status).toBe(400);
       expect((await availability(DATE_A, "no-such-service")).status).toBe(404);
+    });
+    it("does not offer or accept slots beyond the booking window", async () => {
+      const far = nextMonday(200);
+      const res = await availability(far);
+      expect(res.status).toBe(200);
+      expect(res.body.slots).toEqual([]);
+      expect((await book(customer1Token, at(far, "09:00"))).status).toBe(409);
     });
   });
 

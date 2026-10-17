@@ -19,6 +19,10 @@ function todayInAddis(): string {
   return new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
+function maxDateInAddis(): string {
+  return new Date(Date.now() + 3 * 60 * 60 * 1000 + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
 export default function Reschedule() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
@@ -130,6 +134,7 @@ export default function Reschedule() {
           type="date"
           value={date}
           min={todayInAddis()}
+          max={maxDateInAddis()}
           onChange={(e) => chooseDate(e.target.value)}
           className="mt-3 rounded-lg border border-gray-300 p-2"
         />

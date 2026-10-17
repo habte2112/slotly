@@ -8,6 +8,9 @@ export default function Layout() {
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
+      <div className="bg-amber-50 px-4 py-1.5 text-center text-xs text-amber-900">
+        Portfolio demo: please do not enter real personal data.
+      </div>
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
         <nav className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
           <Link to="/" className="flex items-center gap-2 text-lg font-bold text-slate-900">
