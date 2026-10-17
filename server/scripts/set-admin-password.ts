@@ -10,7 +10,7 @@ async function main() {
   }
   await prisma.user.update({
     where: { email: "admin@slotly.dev" },
-    data: { passwordHash: await bcrypt.hash(password, 12) },
+      data: { passwordHash: await bcrypt.hash(password, 12), passwordChangedAt: new Date() },
   });
   console.log("Admin password updated");
 }

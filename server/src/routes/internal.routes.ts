@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { env } from "../config/env";
 import { processReminders } from "../services/email.service";
+import { cleanupExpiredTokens } from "../services/maintenance.service";
 
 export const internalRouter = Router();
 
@@ -30,5 +31,15 @@ internalRouter.post("/send-reminders", async (req, res) => {
     return;
   }
 
-  res.json(await processReminders(query.data.minAgeMinutes));
+  const result = await processReminders(query.data.minAgeMinutes);
+
+  // ማጽዳቱ ቢከሽፍ ማሳሰቢያዎቹ አይነኩም
+  let cleaned: Awaited<ReturnType<typeof cleanupExpiredTokens>> | null = null;
+  try {
+    cleaned = await cleanupExpiredTokens();
+  } catch (err) {
+    console.error("[cleanup] failed:", err instanceof Error ? err.message : "unknown");
+  }
+
+  res.json({ ...result, cleaned });
 });

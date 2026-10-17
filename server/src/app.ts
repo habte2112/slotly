@@ -36,6 +36,11 @@ app.get("/api/health", async (_req, res) => {
   res.json({ status: "ok", db: "connected", users: userCount, time: new Date().toISOString() });
 });
 
+// ዳታቤዝ የማይነካ ቀላል ምልክት (ለ keep-alive ማንቂያ)
+app.get("/api/ping", (_req, res) => {
+  res.json({ ok: true });
+});
+
 app.use("/api", apiLimiter);
 
 app.use("/api/auth", authRouter);

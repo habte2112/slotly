@@ -4,6 +4,7 @@ import bcrypt from "bcrypt";
 import { createHash, randomBytes } from "node:crypto";
 import { app } from "./app";
 import { prisma } from "./lib/prisma";
+import jwt from "jsonwebtoken";
 
 // ዳታቤዝ የሚነኩ ሙከራዎች የሚሰሩት TEST_DATABASE_URL ሲኖር ብቻ ነው
 const describeDb = describe.skipIf(!process.env.TEST_DATABASE_URL);
@@ -112,6 +113,11 @@ describeDb("Slotly API", () => {
       const res = await request(app).get("/api/health");
       expect(res.status).toBe(200);
       expect(res.body).toMatchObject({ status: "ok", db: "connected" });
+    });
+    it("answers /api/ping without touching the database", async () => {
+      const res = await request(app).get("/api/ping");
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ ok: true });
     });
   });
 
@@ -391,6 +397,28 @@ describeDb("Slotly API", () => {
       expect((await request(app).post("/api/auth/reset-password").send({ token, password: "BrandNewPassword456" })).status).toBe(400);
       expect((await request(app).post("/api/auth/reset-password").send({ token: "not-a-token", password: "BrandNewPassword456" })).status).toBe(400);
     });
+    it("revokes tokens issued before a password reset", async () => {
+      const user = await makeUser("revoke");
+      // ከ 2 ደቂቃ በፊት የተሰጠ token (ወደፊት ከሚደረገው ለውጥ በፊት)
+      const oldToken = jwt.sign({ role: user.role, iat: Math.floor(Date.now() / 1000) - 120 }, process.env.JWT_SECRET!, {
+        subject: user.id,
+        algorithm: "HS256",
+        expiresIn: "7d",
+      });
+      expect((await request(app).get("/api/auth/me").set(bearer(oldToken))).status).toBe(200);
+
+      const token = randomBytes(32).toString("hex");
+      await prisma.passwordResetToken.create({
+        data: { userId: user.id, tokenHash: sha256(token), expiresAt: new Date(Date.now() + 60 * 60 * 1000) },
+      });
+      const newPassword = "BrandNewPassword456";
+      expect((await request(app).post("/api/auth/reset-password").send({ token, password: newPassword })).status).toBe(200);
+
+      expect((await request(app).get("/api/auth/me").set(bearer(oldToken))).status).toBe(401);
+
+      const fresh = await login(user.email, newPassword);
+      expect((await request(app).get("/api/auth/me").set(bearer(fresh))).status).toBe(200);
+    });
   });
 
   describe("scheduled reminders endpoint", () => {
@@ -405,9 +433,24 @@ describeDb("Slotly API", () => {
       expect(res.body).toMatchObject({ emailEnabled: false, telegramEnabled: true });
       expect(res.body.due).toEqual(expect.any(Number));
     });
+    it("also removes expired one-time tokens", async () => {
+      const user = await prisma.user.findUniqueOrThrow({ where: { email: email("customer2") } });
+      const stale = await prisma.telegramLinkToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: sha256(randomBytes(16).toString("hex")),
+          expiresAt: new Date(Date.now() - 60_000),
+        },
+      });
+
+      const res = await request(app).post("/api/internal/send-reminders").set(bearer(process.env.CRON_SECRET!));
+      expect(res.status).toBe(200);
+      expect(res.body.cleaned.telegramLinkTokens).toBeGreaterThanOrEqual(1);
+      expect(await prisma.telegramLinkToken.findUnique({ where: { id: stale.id } })).toBeNull();
+    });
   });
   
-    describe("admin panel", () => {
+  describe("admin panel", () => {
     it("keeps admin endpoints for admins only", async () => {
       expect((await request(app).get("/api/admin/stats")).status).toBe(401);
       expect((await request(app).get("/api/admin/stats").set(bearer(customer1Token))).status).toBe(403);

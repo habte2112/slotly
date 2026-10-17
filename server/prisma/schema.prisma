@@ -29,6 +29,7 @@ model User {
   passwordHash String
   role         Role     @default(CUSTOMER)
   createdAt    DateTime @default(now())
+  passwordChangedAt DateTime?
 
   provider Provider?
   bookings Booking[]  @relation("CustomerBookings")

@@ -162,7 +162,10 @@ export async function resetPassword(req: Request, res: Response) {
       data: { usedAt: new Date() },
     });
     if (claim.count === 0) return false;
-    await tx.user.update({ where: { id: record.userId }, data: { passwordHash } });
+    await tx.user.update({
+      where: { id: record.userId },
+      data: { passwordHash, passwordChangedAt: new Date() },
+    });
     await tx.passwordResetToken.deleteMany({ where: { userId: record.userId, id: { not: record.id } } });
     return true;
   });
