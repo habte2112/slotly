@@ -548,6 +548,7 @@ describeDb("Slotly API", () => {
       });
       expect(rows.map((r) => r.priceAtBooking)).toEqual([100, 150]);
     });
+  });
 
   describe("telegram notifications", () => {
     const chatId = 700_000_000 + Math.floor(Math.random() * 90_000_000);
@@ -665,7 +666,54 @@ describeDb("Slotly API", () => {
       const status = await request(app).get("/api/telegram/status").set(bearer(customer1Token));
       expect(status.body.linked).toBe(false);
     });
-  });
-  });
+    });
+  
+  describe("service variants (data model)", () => {
+    it("links variants to specialists with optional overrides and a booking", async () => {
+      const customer = await prisma.user.findUniqueOrThrow({ where: { email: email("customer1") } });
 
+      const service = await prisma.service.create({
+        data: { name: `Test variants ${tag}`, durationMinutes: 30, price: 100 },
+      });
+      const variant = await prisma.serviceVariant.create({
+        data: { serviceId: service.id, name: "Fade", durationMinutes: 45, price: 400 },
+      });
+      await prisma.providerService.create({ data: { providerId, serviceId: service.id } });
+      await prisma.providerVariant.create({ data: { providerId, variantId: variant.id, priceOverride: 450 } });
+
+      const link = await prisma.providerVariant.findUniqueOrThrow({
+        where: { providerId_variantId: { providerId, variantId: variant.id } },
+      });
+      expect(link.priceOverride).toBe(450);
+      expect(link.durationOverride).toBeNull();
+
+      const startAt = new Date(at(addDays(DATE_A, 42), "09:00"));
+      const booking = await prisma.booking.create({
+        data: {
+          customerId: customer.id,
+          providerId,
+          serviceId: service.id,
+          variantId: variant.id,
+          startAt,
+          endAt: new Date(startAt.getTime() + 45 * 60 * 1000),
+          priceAtBooking: 450,
+        },
+      });
+      expect(booking.variantId).toBe(variant.id);
+    }, 60_000);
+
+    it("enforces unique variant names within a service", async () => {
+      const service = await prisma.service.create({
+        data: { name: `Test unique ${tag}`, durationMinutes: 30, price: 100 },
+      });
+      await prisma.serviceVariant.create({
+        data: { serviceId: service.id, name: "Fade", durationMinutes: 45, price: 400 },
+      });
+      await expect(
+        prisma.serviceVariant.create({
+          data: { serviceId: service.id, name: "Fade", durationMinutes: 30, price: 300 },
+        }),
+      ).rejects.toThrow();
+    }, 60_000);
+  });
 });
