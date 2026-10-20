@@ -3,6 +3,7 @@ import { env } from "../config/env";
 import { prisma } from "../lib/prisma";
 import { googleCalendarUrl } from "./calendar";
 import type { BookingEmailKind } from "./email.service";
+import { serviceLabel } from "./labels";
 
 export const telegramEnabled = Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_BOT_USERNAME);
 
@@ -100,12 +101,13 @@ export async function sendBookingTelegram(kind: BookingEmailKind, bookingId: str
         customer: { select: { telegramChatId: true } },
         provider: { select: { user: { select: { name: true } } } },
         service: { select: { name: true, price: true } },
+        variant: { select: { name: true } },
       },
     });
     const chatId = booking?.customer.telegramChatId;
     if (!booking || !chatId) return false;
 
-    const title = `${booking.service.name} with ${booking.provider.user.name}`;
+    const title = `${serviceLabel(booking.service.name, booking.variant?.name)} with ${booking.provider.user.name}`;
     const price = booking.priceAtBooking ?? booking.service.price;
     const text =
       `${HEADINGS[kind]}\n\n<b>${escapeHtml(title)}</b>\n` +

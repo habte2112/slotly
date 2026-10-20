@@ -910,4 +910,108 @@ describeDb("Slotly API", () => {
       expect(await prisma.providerVariant.count({ where: { providerId: providerBId } })).toBe(0);
     });
   });
+    describe("service variants (admin API)", () => {
+    let svcId = "";
+    let adminProviderId = "";
+    let variantId = "";
+
+    const post = (id: string, body: object, token = adminToken) =>
+      request(app).post(`/api/admin/services/${id}/variants`).set(bearer(token)).send(body);
+    const putVariants = (id: string, variants: object[], token = adminToken) =>
+      request(app).put(`/api/admin/providers/${id}/variants`).set(bearer(token)).send({ variants });
+
+    beforeAll(async () => {
+      const passwordHash = await bcrypt.hash(PASSWORD, 4);
+      const user = await prisma.user.create({
+        data: { name: "provider3", email: email("provider3"), passwordHash, role: "PROVIDER" },
+      });
+      const provider = await prisma.provider.create({ data: { userId: user.id } });
+      adminProviderId = provider.id;
+      const svc = await prisma.service.create({
+        data: { name: `Test admin styles ${tag}`, durationMinutes: 30, price: 100 },
+      });
+      svcId = svc.id;
+      await prisma.providerService.create({ data: { providerId: adminProviderId, serviceId: svcId } });
+    }, 60_000);
+
+    it("lets only admins create styles and assigns them to the specialists who offer the service", async () => {
+      const body = { name: "Fade", durationMinutes: 45, price: 400 };
+      expect((await request(app).post(`/api/admin/services/${svcId}/variants`).send(body)).status).toBe(401);
+      expect((await post(svcId, body, customer1Token)).status).toBe(403);
+
+      const created = await post(svcId, body);
+      expect(created.status).toBe(201);
+      expect(created.body.variant).toMatchObject({ name: "Fade", durationMinutes: 45, price: 400, isActive: true });
+      expect(created.body.assignedTo).toBe(1);
+      variantId = created.body.variant.id;
+
+      const link = await prisma.providerVariant.findUnique({
+        where: { providerId_variantId: { providerId: adminProviderId, variantId } },
+      });
+      expect(link).not.toBeNull();
+    });
+
+    it("rejects duplicate names and invalid input", async () => {
+      expect((await post(svcId, { name: "Fade", durationMinutes: 30, price: 300 })).status).toBe(409);
+      expect((await post(svcId, { name: "Short", durationMinutes: 3, price: 300 })).status).toBe(400);
+      expect((await post(svcId, { name: "Negative", durationMinutes: 30, price: -5 })).status).toBe(400);
+      expect((await post(svcId, { name: "x", durationMinutes: 30, price: 100 })).status).toBe(400);
+      expect((await post("no-such-service", { name: "Fade", durationMinutes: 30, price: 300 })).status).toBe(404);
+    });
+
+    it("sets a specialist's own price and duration for a style", async () => {
+      const put = await putVariants(adminProviderId, [{ variantId, priceOverride: 500, durationOverride: 60 }]);
+      expect(put.status).toBe(200);
+
+      const list = await request(app).get("/api/providers").query({ serviceId: svcId, variantId });
+      const mine = list.body.providers.find((p: { id: string }) => p.id === adminProviderId);
+      expect(mine.variants.find((v: { id: string }) => v.id === variantId)).toMatchObject({
+        price: 500,
+        durationMinutes: 60,
+      });
+
+      const admin = await request(app).get("/api/admin/providers").set(bearer(adminToken));
+      const row = admin.body.providers.find((p: { id: string }) => p.id === adminProviderId);
+      expect(row.variants).toEqual(expect.arrayContaining([{ variantId, priceOverride: 500, durationOverride: 60 }]));
+    });
+
+    it("validates the styles a specialist can be given", async () => {
+      const other = await prisma.service.create({
+        data: { name: `Test other ${tag}`, durationMinutes: 30, price: 100 },
+      });
+      const foreign = await prisma.serviceVariant.create({
+        data: { serviceId: other.id, name: "Foreign", durationMinutes: 30, price: 100 },
+      });
+
+      expect((await putVariants(adminProviderId, [{ variantId: foreign.id }])).status).toBe(400); // አገልግሎቱን አትሰጥም
+      expect((await putVariants(adminProviderId, [{ variantId: "no-such-style" }])).status).toBe(400);
+      expect((await putVariants(adminProviderId, [{ variantId }, { variantId }])).status).toBe(400);
+      expect((await putVariants(adminProviderId, [{ variantId, durationOverride: 2 }])).status).toBe(400);
+      expect((await putVariants(adminProviderId, [], customer1Token)).status).toBe(403);
+      expect((await putVariants("no-such-provider", [])).status).toBe(404);
+    });
+
+    it("updates, renames and hides a style", async () => {
+      const second = await post(svcId, { name: "Kids cut", durationMinutes: 30, price: 250 });
+      expect(second.status).toBe(201);
+
+      const patch = (id: string, body: object) =>
+        request(app).patch(`/api/admin/variants/${id}`).set(bearer(adminToken)).send(body);
+
+      expect((await patch(second.body.variant.id, { name: "Fade" })).status).toBe(409);
+      expect((await patch("no-such-style", { price: 1 })).status).toBe(404);
+
+      const hidden = await patch(variantId, { price: 420, isActive: false });
+      expect(hidden.status).toBe(200);
+      expect(hidden.body.variant).toMatchObject({ price: 420, isActive: false });
+
+      const catalog = await request(app).get("/api/services");
+      const entry = catalog.body.services.find((s: { id: string }) => s.id === svcId);
+      expect(entry.variants.map((v: { name: string }) => v.name)).toEqual(["Kids cut"]);
+
+      const admin = await request(app).get("/api/admin/services").set(bearer(adminToken));
+      const row = admin.body.services.find((s: { id: string }) => s.id === svcId);
+      expect(row.variants.map((v: { name: string }) => v.name).sort()).toEqual(["Fade", "Kids cut"]);
+    });
+  });
 });

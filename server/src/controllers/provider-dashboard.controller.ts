@@ -153,8 +153,10 @@ const providerBookingSelect = {
   endAt: true,
   status: true,
   notes: true,
+  priceAtBooking: true,
   customer: { select: { name: true, phone: true } },
   service: { select: { name: true, durationMinutes: true } },
+  variant: { select: { name: true } },
 } as const;
 
 export async function listProviderBookings(req: AuthRequest, res: Response) {

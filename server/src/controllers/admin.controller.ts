@@ -112,9 +112,11 @@ const adminBookingSelect = {
   startAt: true,
   endAt: true,
   status: true,
+  priceAtBooking: true,
   customer: { select: { name: true, email: true } },
   provider: { select: { user: { select: { name: true } } } },
   service: { select: { name: true } },
+  variant: { select: { name: true } },
 } as const;
 
 export async function listAdminBookings(req: Request, res: Response) {
@@ -129,9 +131,12 @@ export async function listAdminBookings(req: Request, res: Response) {
   res.json({ bookings });
 }
 
-// ሁሉም አገልግሎቶች (ያልነቁትንም ጨምሮ)
+// ሁሉም አገልግሎቶች እና ዘይቤዎቻቸው (ያልነቁትንም ጨምሮ)
 export async function listAdminServices(_req: Request, res: Response) {
-  const services = await prisma.service.findMany({ orderBy: { name: "asc" } });
+  const services = await prisma.service.findMany({
+    orderBy: { name: "asc" },
+    include: { variants: { orderBy: [{ sortOrder: "asc" }, { name: "asc" }] } },
+  });
   res.json({ services });
 }
 
@@ -143,6 +148,7 @@ export async function listAdminProviders(_req: Request, res: Response) {
       bio: true,
       user: { select: { name: true, email: true } },
       services: { select: { service: { select: { id: true, name: true } } } },
+      variants: { select: { variantId: true, priceOverride: true, durationOverride: true } },
     },
   });
   res.json({
@@ -152,6 +158,7 @@ export async function listAdminProviders(_req: Request, res: Response) {
       email: p.user.email,
       bio: p.bio,
       services: p.services.map((s) => s.service),
+      variants: p.variants,
     })),
   });
 }

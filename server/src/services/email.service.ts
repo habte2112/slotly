@@ -4,6 +4,7 @@ import { env } from "../config/env";
 import { prisma } from "../lib/prisma";
 import { buildIcs, googleCalendarUrl } from "./calendar";
 import { sendBookingTelegram, telegramEnabled } from "./telegram.service";
+import { serviceLabel } from "./labels";
 
 export type BookingEmailKind =
   | "confirmed"
@@ -29,20 +30,10 @@ interface BookingForEmail {
   startAt: Date;
   endAt: Date;
   priceAtBooking: number | null;
-  customer: {
-    name: string;
-    email: string;
-  };
-  provider: {
-    user: {
-      name: string;
-    };
-  };
-  service: {
-    name: string;
-    durationMinutes: number;
-    price: number;
-  };
+  customer: { name: string; email: string };
+  provider: { user: { name: string } };
+  service: { name: string; durationMinutes: number; price: number };
+  variant: { name: string } | null;
 }
 
 // Load the booking and the related information needed for emails.
@@ -78,6 +69,11 @@ async function loadBooking(
           price: true,
         },
       },
+      variant: { 
+        select: { 
+          name: true 
+        } 
+      },
     },
   });
 }
@@ -91,68 +87,52 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function describe(
-  kind: BookingEmailKind,
-  b: BookingForEmail
-): { subject: string; heading: string; intro: string } {
+function describe(kind: BookingEmailKind, b: BookingForEmail) {
+  const label = serviceLabel(b.service.name, b.variant?.name);
   const when = whenFormat.format(b.startAt);
-
   switch (kind) {
     case "confirmed":
       return {
-        subject: `Booking confirmed: ${b.service.name}`,
+        subject: `Booking confirmed: ${label}`,
         heading: "Your booking is confirmed",
-        intro:
-          "Thank you for booking with Slotly. Here are your appointment details.",
+        intro: "Thank you for booking with Slotly. Here are your appointment details.",
       };
-
     case "rescheduled":
       return {
-        subject: `Booking rescheduled: ${b.service.name}`,
+        subject: `Booking rescheduled: ${label}`,
         heading: "Your booking was rescheduled",
-        intro:
-          "Your appointment has been moved to the new time below.",
+        intro: "Your appointment has been moved to the new time below.",
       };
-
     case "cancelled_by_customer":
       return {
-        subject: `Booking cancelled: ${b.service.name}`,
+        subject: `Booking cancelled: ${label}`,
         heading: "Your booking was cancelled",
-        intro:
-          "You cancelled this appointment. We hope to see you again soon.",
+        intro: "You cancelled this appointment. We hope to see you again soon.",
       };
-
     case "cancelled_by_provider":
       return {
-        subject: `Booking cancelled: ${b.service.name}`,
+        subject: `Booking cancelled: ${label}`,
         heading: "Your booking was cancelled",
-        intro:
-          "Unfortunately the service provider had to cancel this appointment. Please book another time.",
+        intro: "Unfortunately the service provider had to cancel this appointment. Please book another time.",
       };
-
     case "reminder":
       return {
-        subject: `Reminder: ${b.service.name} on ${when}`,
+        subject: `Reminder: ${label} on ${when}`,
         heading: "Your appointment is coming up",
-        intro:
-          "This is a friendly reminder about your upcoming appointment.",
+        intro: "This is a friendly reminder about your upcoming appointment.",
       };
   }
 }
 
 function details(b: BookingForEmail): [string, string][] {
+  // ርዝመቱ ከቀጠሮው ራሱ ነው፤ የባለሙያ ልዩ ጊዜ ካለ እሱን ያንጸባርቃል
+  const minutes = Math.round((b.endAt.getTime() - b.startAt.getTime()) / 60000);
   return [
-    ["Service", b.service.name],
+    ["Service", serviceLabel(b.service.name, b.variant?.name)],
     ["Specialist", b.provider.user.name],
-    [
-      "When",
-      `${whenFormat.format(b.startAt)} (Addis Ababa time)`,
-    ],
-    ["Duration", `${b.service.durationMinutes} min`],
-    [
-      "Price",
-      `${b.priceAtBooking ?? b.service.price} ETB`,
-    ],
+    ["When", `${whenFormat.format(b.startAt)} (Addis Ababa time)`],
+    ["Duration", `${minutes} min`],
+    ["Price", `${b.priceAtBooking ?? b.service.price} ETB`],
   ];
 }
 
@@ -248,7 +228,7 @@ export async function sendBookingEmail(
       id: booking.id,
       startAt: booking.startAt,
       endAt: booking.endAt,
-      title: `${booking.service.name} with ${booking.provider.user.name}`,
+      title: `${serviceLabel(booking.service.name, booking.variant?.name)} with ${booking.provider.user.name}`,
       description: "Booked on Slotly",
     };
 

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { notifyBooking } from "./email.service";
 import { callTelegram, escapeHtml, hashToken, sendTelegramMessage } from "./telegram.service";
+import { serviceLabel } from "./labels";
 
 const TZ = "Africa/Addis_Ababa";
 const whenFormat = new Intl.DateTimeFormat("en-GB", {
@@ -58,6 +59,7 @@ const upcomingFor = (customerId: string) =>
       id: true,
       startAt: true,
       service: { select: { name: true } },
+      variant: { select: { name: true } },
       provider: { select: { user: { select: { name: true } } } },
     },
   });
@@ -156,9 +158,9 @@ async function showBookings(chatId: number): Promise<void> {
     await sendTelegramMessage(chatId, "You have no upcoming bookings.");
     return;
   }
-  const lines = bookings.map(
+    const lines = bookings.map(
     (b) =>
-      `<b>${escapeHtml(b.service.name)}</b> with ${escapeHtml(b.provider.user.name)}\n📅 ${escapeHtml(whenFormat.format(b.startAt))}`,
+      `<b>${escapeHtml(serviceLabel(b.service.name, b.variant?.name))}</b> with ${escapeHtml(b.provider.user.name)}\n📅 ${escapeHtml(whenFormat.format(b.startAt))}`,
   );
   await sendTelegramMessage(chatId, `<b>Your upcoming bookings</b>\n\n${lines.join("\n\n")}\n\nSend /cancel to cancel one.`);
 }
@@ -175,7 +177,7 @@ async function showCancelMenu(chatId: number): Promise<void> {
     return;
   }
   const keyboard = bookings.map((b) => [
-    { text: `${b.service.name} · ${shortFormat.format(b.startAt)}`, callback_data: `c:${b.id}` },
+    { text: `${serviceLabel(b.service.name, b.variant?.name)} · ${shortFormat.format(b.startAt)}`, callback_data: `c:${b.id}` },
   ]);
   await sendTelegramMessage(chatId, "Which booking do you want to cancel?", { inline_keyboard: keyboard });
 }
@@ -193,6 +195,7 @@ const bookingOfChat = (chatId: number, bookingId: string) =>
       id: true,
       startAt: true,
       service: { select: { name: true } },
+      variant: { select: { name: true } },
     },
   });
 
@@ -219,7 +222,7 @@ async function handleCallback(callback: NonNullable<Update["callback_query"]>): 
   if (action === "c") {
     await sendTelegramMessage(
       chat.id,
-      `Cancel <b>${escapeHtml(booking.service.name)}</b> on ${escapeHtml(whenFormat.format(booking.startAt))}?`,
+      `Cancel <b>${escapeHtml(serviceLabel(booking.service.name, booking.variant?.name))}</b> on ${escapeHtml(whenFormat.format(booking.startAt))}?`,
       {
         inline_keyboard: [
           [
