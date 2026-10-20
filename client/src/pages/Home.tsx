@@ -127,9 +127,25 @@ export default function Home() {
               </span>
               <h3 className="mt-4 font-semibold text-slate-900">{s.name}</h3>
               <p className="mt-1 flex-1 text-sm text-slate-600">{s.description}</p>
+              {s.variants.length > 0 && (
+                <p className="mt-3 text-xs font-medium text-brand-700">{s.variants.length} styles to choose from</p>
+              )}
               <div className="mt-4 flex items-center justify-between text-sm">
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">{s.durationMinutes} min</span>
-                <span className="font-semibold text-slate-900">{s.price} ETB</span>
+                {s.variants.length > 0 ? (
+                  <>
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">
+                      from {Math.min(...s.variants.map((v) => v.durationMinutes))} min
+                    </span>
+                    <span className="font-semibold text-slate-900">
+                      from {Math.min(...s.variants.map((v) => v.price))} ETB
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">{s.durationMinutes} min</span>
+                    <span className="font-semibold text-slate-900">{s.price} ETB</span>
+                  </>
+                )}
               </div>
               <Link
                 to={`/book/${s.id}`}

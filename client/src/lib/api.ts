@@ -5,8 +5,22 @@ export interface ServiceSummary {
   price: number;
 }
 
+export interface Style {
+  id: string;
+  name: string;
+  description: string | null;
+  durationMinutes: number;
+  price: number;
+  imageUrl: string | null;
+}
+
 export interface Service extends ServiceSummary {
   description: string | null;
+  variants: Style[];
+}
+
+export interface ProviderStyle extends Style {
+  serviceId: string;
 }
 
 export interface Provider {
@@ -15,6 +29,7 @@ export interface Provider {
   bio: string | null;
   photoUrl: string | null;
   services: ServiceSummary[];
+  variants: ProviderStyle[];
 }
 
 export interface User {
@@ -40,6 +55,7 @@ export interface Booking {
   priceAtBooking: number | null;
   provider: { id: string; user: { name: string } };
   service: ServiceSummary;
+  variant: { id: string; name: string } | null;
 }
 
 const TOKEN_KEY = "slotly_token";
@@ -108,18 +124,33 @@ export const getMe = () => request<{ user: User }>("/auth/me").then((r) => r.use
 // ---- Catalog ----
 export const getServices = () => request<{ services: Service[] }>("/services").then((r) => r.services);
 
-export const getProviders = (serviceId?: string) =>
-  request<{ providers: Provider[] }>(`/providers${serviceId ? `?serviceId=${serviceId}` : ""}`).then(
-    (r) => r.providers,
-  );
+export const getProviders = (serviceId?: string, variantId?: string) => {
+  const params = new URLSearchParams();
+  if (serviceId) params.set("serviceId", serviceId);
+  if (variantId) params.set("variantId", variantId);
+  const query = params.toString();
+  return request<{ providers: Provider[] }>(`/providers${query ? `?${query}` : ""}`).then((r) => r.providers);
+};
 
-export const getAvailability = (providerId: string, serviceId: string, date: string) =>
-  request<{ slots: Slot[] }>(`/providers/${providerId}/availability?date=${date}&serviceId=${serviceId}`).then(
-    (r) => r.slots,
+export interface Availability {
+  slots: Slot[];
+  durationMinutes: number;
+  price: number;
+}
+
+export const getAvailability = (providerId: string, serviceId: string, date: string, variantId?: string) =>
+  request<Availability>(
+    `/providers/${providerId}/availability?date=${date}&serviceId=${serviceId}${variantId ? `&variantId=${variantId}` : ""}`,
   );
 
 // ---- Bookings ----
-export const createBooking = (input: { providerId: string; serviceId: string; startAt: string; notes?: string }) =>
+export const createBooking = (input: {
+  providerId: string;
+  serviceId: string;
+  variantId?: string;
+  startAt: string;
+  notes?: string;
+}) =>
   request<{ booking: Booking }>("/bookings", { method: "POST", body: JSON.stringify(input) }).then(
     (r) => r.booking,
   );
@@ -151,6 +182,8 @@ export interface ProviderBooking {
   notes: string | null;
   customer: { name: string; phone: string | null };
   service: { name: string; durationMinutes: number };
+  variant: { name: string } | null;
+  priceAtBooking: number | null;
 }
 
 export const getProviderMe = () =>
@@ -183,7 +216,7 @@ export const updateProviderBookingStatus = (id: string, status: "COMPLETED" | "C
     body: JSON.stringify({ status }),
   }).then((r) => r.booking);
 
-  // ---- Reschedule ----
+// ---- Reschedule ----
 export const getRescheduleSlots = (bookingId: string, date: string) =>
   request<{ slots: Slot[] }>(`/bookings/${bookingId}/availability?date=${date}`).then((r) => r.slots);
 
@@ -193,7 +226,7 @@ export const rescheduleBooking = (id: string, startAt: string) =>
     body: JSON.stringify({ startAt }),
   }).then((r) => r.booking);
 
-  // ---- Password reset ----
+// ---- Password reset ----
 export const forgotPassword = (email: string) =>
   request<{ message: string }>("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) });
 
@@ -203,7 +236,7 @@ export const resetPassword = (token: string, password: string) =>
     body: JSON.stringify({ token, password }),
   });
 
-  // ---- Admin ----
+// ---- Admin ----
 export interface AdminStats {
   days: number;
   from: string;
@@ -233,13 +266,23 @@ export interface AdminBooking {
   customer: { name: string; email: string };
   provider: { user: { name: string } };
   service: { name: string };
+  variant: { name: string } | null;
+  priceAtBooking: number | null;
 }
 
 export const getAdminBookings = (scope: "upcoming" | "past") =>
   request<{ bookings: AdminBooking[] }>(`/admin/bookings?scope=${scope}`).then((r) => r.bookings);
 
-export interface AdminService extends Service {
+export interface AdminStyle extends Style {
+  serviceId: string;
   isActive: boolean;
+  sortOrder: number;
+}
+
+export interface AdminService extends ServiceSummary {
+  description: string | null;
+  isActive: boolean;
+  variants: AdminStyle[];
 }
 
 export const getAdminServices = () =>
@@ -251,14 +294,33 @@ export const createService = (input: {
   durationMinutes: number;
   price: number;
 }) =>
-  request<{ service: AdminService }>("/services", { method: "POST", body: JSON.stringify(input) }).then(
-    (r) => r.service,
-  );
+  request<{ service: Omit<AdminService, "variants"> }>("/services", {
+    method: "POST",
+    body: JSON.stringify(input),
+  }).then((r) => ({ ...r.service, variants: [] as AdminStyle[] }));
 
 export const updateService = (id: string, patch: { isActive?: boolean }) =>
   request<{ service: AdminService }>(`/services/${id}`, { method: "PATCH", body: JSON.stringify(patch) }).then(
     (r) => r.service,
   );
+
+export const createStyle = (
+  serviceId: string,
+  input: { name: string; description?: string; durationMinutes: number; price: number }
+) =>
+  request<{ variant: AdminStyle; assignedTo: number }>(`/admin/services/${serviceId}/variants`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+
+export const updateStyle = (
+  id: string,
+  patch: { isActive?: boolean; price?: number; durationMinutes?: number; name?: string; description?: string }
+) =>
+  request<{ variant: AdminStyle }>(`/admin/variants/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  }).then((r) => r.variant);
 
 export interface AdminProvider {
   id: string;
@@ -266,6 +328,11 @@ export interface AdminProvider {
   email: string;
   bio: string | null;
   services: { id: string; name: string }[];
+  variants: {
+    variantId: string;
+    priceOverride: number | null;
+    durationOverride: number | null;
+  }[];
 }
 
 export const getAdminProviders = () =>
@@ -283,7 +350,16 @@ export const setProviderServices = (id: string, serviceIds: string[]) =>
     body: JSON.stringify({ serviceIds }),
   });
 
-  // ---- Telegram ----
+export const setProviderStyles = (
+  providerId: string,
+  variants: { variantId: string; priceOverride: number | null; durationOverride: number | null }[]
+) =>
+  request<{ variants: AdminProvider["variants"] }>(`/admin/providers/${providerId}/variants`, {
+    method: "PUT",
+    body: JSON.stringify({ variants }),
+  });
+
+// ---- Telegram ----
 export interface TelegramStatus {
   enabled: boolean;
   linked: boolean;

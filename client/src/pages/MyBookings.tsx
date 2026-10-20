@@ -39,7 +39,9 @@ function BookingRow({
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="font-semibold text-slate-900">{b.service.name}</p>
+        <p className="font-semibold text-slate-900">
+          {b.variant ? `${b.service.name} · ${b.variant.name}` : b.service.name}
+        </p>
         <p className="text-sm text-slate-600">with {b.provider.user.name}</p>
         <p className="text-sm text-slate-500">
           {weekdayFmt.format(start)}, {timeFmt.format(start)} – {timeFmt.format(end)} ·{" "}

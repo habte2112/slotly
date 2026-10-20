@@ -81,7 +81,7 @@ export default function AdminBookings() {
             <li key={b.id} className="flex items-start justify-between gap-4 rounded-xl border border-gray-200 bg-white p-4">
               <div>
                 <p className="font-medium text-gray-900">
-                  {b.service.name} · {b.provider.user.name}
+                  {b.variant ? `${b.service.name} · ${b.variant.name}` : b.service.name} · {b.provider.user.name}
                 </p>
                 <p className="text-sm text-gray-600">{formatter.format(new Date(b.startAt))}</p>
                 <p className="text-sm text-gray-500">

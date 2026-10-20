@@ -7,13 +7,16 @@ import {
   getProviders,
   getServices,
   type Provider,
+  type ProviderStyle,
   type Service,
   type Slot,
+  type Style,
 } from "../lib/api";
 import { useAuth } from "../context/auth-context";
 import Avatar from "../components/ui/Avatar";
 import ServiceIcon from "../components/ui/ServiceIcon";
 import Skeleton from "../components/ui/Skeleton";
+import StyleImage from "../components/ui/StyleImage";
 
 // የአዲስ አበባ የዛሬ ቀን (UTC+3)
 function todayInAddis(): string {
@@ -64,9 +67,11 @@ export default function BookingPage() {
   const [providers, setProviders] = useState<Provider[] | null>(null);
   const [loadError, setLoadError] = useState("");
 
+  const [styleId, setStyleId] = useState("");
   const [providerId, setProviderId] = useState("");
   const [date, setDate] = useState(todayInAddis);
   const [slots, setSlots] = useState<Slot[] | null>(null);
+  const [terms, setTerms] = useState<{ durationMinutes: number; price: number } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [selected, setSelected] = useState<Slot | null>(null);
   const [notes, setNotes] = useState("");
@@ -90,13 +95,26 @@ export default function BookingPage() {
     };
   }, [serviceId]);
 
-  // ባለሙያ ወይም ቀን ሲቀየር ባዶ ሰዓቶችን ይጭናል
+  const styles: Style[] = service?.variants ?? [];
+  const hasStyles = styles.length > 0;
+  const style = styles.find((s) => s.id === styleId) ?? null;
+
+  // ዘይቤው የሚፈለግ ከሆነ ባለሙያዎቹ ያንን ዘይቤ የሚሰጡት ብቻ ናቸው
+  const eligible = (providers ?? []).filter((p) =>
+    hasStyles ? p.variants.some((v) => v.id === styleId && v.serviceId === serviceId) : true,
+  );
+  const provider = eligible.find((p) => p.id === providerId) ?? null;
+  const styleOf = (p: Provider): ProviderStyle | undefined => p.variants.find((v) => v.id === styleId);
+
+  // ባለሙያ፣ ዘይቤ ወይም ቀን ሲቀየር ባዶ ሰዓቶችን ይጭናል
   useEffect(() => {
-    if (!providerId || !date) return;
+    if (!providerId || !date || (hasStyles && !styleId)) return;
     let cancelled = false;
-    getAvailability(providerId, serviceId, date)
-      .then((s) => {
-        if (!cancelled) setSlots(s);
+    getAvailability(providerId, serviceId, date, hasStyles ? styleId : undefined)
+      .then((a) => {
+        if (cancelled) return;
+        setSlots(a.slots);
+        setTerms({ durationMinutes: a.durationMinutes, price: a.price });
       })
       .catch((e) => {
         if (cancelled) return;
@@ -106,21 +124,30 @@ export default function BookingPage() {
     return () => {
       cancelled = true;
     };
-  }, [providerId, date, serviceId, refreshKey]);
+  }, [providerId, date, serviceId, styleId, hasStyles, refreshKey]);
+
+  function resetSelection() {
+    setSlots(null);
+    setTerms(null);
+    setSelected(null);
+    setError("");
+  }
+
+  function chooseStyle(id: string) {
+    setStyleId(id);
+    setProviderId("");
+    resetSelection();
+  }
 
   function chooseProvider(id: string) {
     setProviderId(id);
-    setSlots(null);
-    setSelected(null);
-    setError("");
+    resetSelection();
   }
 
   function chooseDate(value: string) {
     if (!value) return;
     setDate(value);
-    setSlots(null);
-    setSelected(null);
-    setError("");
+    resetSelection();
   }
 
   async function confirm() {
@@ -136,6 +163,7 @@ export default function BookingPage() {
       await createBooking({
         providerId,
         serviceId,
+        variantId: hasStyles ? styleId : undefined,
         startAt: selected.start,
         notes: notes.trim() || undefined,
       });
@@ -157,7 +185,17 @@ export default function BookingPage() {
 
   if (loadError) return <p className="text-red-600">{loadError}</p>;
 
-  if (!providers) {
+  if (!providers || !service) {
+    if (providers && !service) {
+      return (
+        <p className="text-slate-700">
+          Service not found.{" "}
+          <Link to="/" className="underline">
+            Back to services
+          </Link>
+        </p>
+      );
+    }
     return (
       <div className="space-y-4">
         <Skeleton className="h-8 w-48" />
@@ -170,18 +208,11 @@ export default function BookingPage() {
     );
   }
 
-  if (!service) {
-    return (
-      <p className="text-slate-700">
-        Service not found.{" "}
-        <Link to="/" className="underline">
-          Back to services
-        </Link>
-      </p>
-    );
-  }
-
-  const provider = providers.find((p) => p.id === providerId);
+  const specialistStep = hasStyles ? 2 : 1;
+  const dateStep = specialistStep + 1;
+  const timeStep = dateStep + 1;
+  const confirmStep = timeStep + 1;
+  const showSpecialists = !hasStyles || Boolean(styleId);
 
   return (
     <div className="space-y-8">
@@ -195,40 +226,84 @@ export default function BookingPage() {
           </span>
           <div>
             <h1 className="text-3xl font-bold text-slate-900">{service.name}</h1>
-            <p className="text-slate-600">
-              {service.durationMinutes} min · {service.price} ETB
-            </p>
+            {!hasStyles && (
+              <p className="text-slate-600">
+                {service.durationMinutes} min · {service.price} ETB
+              </p>
+            )}
           </div>
         </div>
       </div>
 
-      <section>
-        <StepTitle n={1}>Choose a specialist</StepTitle>
-        {providers.length === 0 && <p className="mt-3 text-slate-500">No specialists offer this service yet.</p>}
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {providers.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => chooseProvider(p.id)}
-              className={`flex items-start gap-3 rounded-2xl border p-4 text-left transition ${
-                providerId === p.id
-                  ? "border-brand-600 bg-brand-50 ring-1 ring-brand-600"
-                  : "border-slate-200 bg-white hover:border-brand-300"
-              }`}
-            >
-              <Avatar name={p.name} className="h-11 w-11 text-base" />
-              <span>
-                <span className="block font-medium text-slate-900">{p.name}</span>
-                <span className="mt-0.5 block text-sm text-slate-600">{p.bio}</span>
-              </span>
-            </button>
-          ))}
-        </div>
-      </section>
+      {hasStyles && (
+        <section>
+          <StepTitle n={1}>Choose a style</StepTitle>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {styles.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => chooseStyle(s.id)}
+                className={`overflow-hidden rounded-2xl border text-left transition ${
+                  styleId === s.id
+                    ? "border-brand-600 bg-brand-50 ring-1 ring-brand-600"
+                    : "border-slate-200 bg-white hover:border-brand-300"
+                }`}
+              >
+                <StyleImage src={s.imageUrl} alt={s.name} serviceName={service.name} className="h-32 w-full" />
+                <span className="block p-3">
+                  <span className="block font-medium text-slate-900">{s.name}</span>
+                  {s.description && <span className="mt-0.5 block text-sm text-slate-600">{s.description}</span>}
+                  <span className="mt-2 block text-sm text-slate-700">
+                    {s.durationMinutes} min · from {s.price} ETB
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {showSpecialists && (
+        <section>
+          <StepTitle n={specialistStep}>Choose a specialist</StepTitle>
+          {eligible.length === 0 && (
+            <p className="mt-3 text-slate-500">
+              {hasStyles ? "No specialists offer this style yet." : "No specialists offer this service yet."}
+            </p>
+          )}
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {eligible.map((p) => {
+              const own = hasStyles ? styleOf(p) : undefined;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => chooseProvider(p.id)}
+                  className={`flex items-start gap-3 rounded-2xl border p-4 text-left transition ${
+                    providerId === p.id
+                      ? "border-brand-600 bg-brand-50 ring-1 ring-brand-600"
+                      : "border-slate-200 bg-white hover:border-brand-300"
+                  }`}
+                >
+                  <Avatar name={p.name} className="h-11 w-11 text-base" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-medium text-slate-900">{p.name}</span>
+                    <span className="mt-0.5 block text-sm text-slate-600">{p.bio}</span>
+                    {own && (
+                      <span className="mt-2 block text-sm font-medium text-brand-700">
+                        {own.price} ETB · {own.durationMinutes} min
+                      </span>
+                    )}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {providerId && (
         <section>
-          <StepTitle n={2}>Choose a date</StepTitle>
+          <StepTitle n={dateStep}>Choose a date</StepTitle>
           <input
             type="date"
             value={date}
@@ -242,7 +317,7 @@ export default function BookingPage() {
 
       {providerId && (
         <section>
-          <StepTitle n={3}>Choose a time</StepTitle>
+          <StepTitle n={timeStep}>Choose a time</StepTitle>
 
           {slots === null && (
             <div className="mt-4 flex flex-wrap gap-2">
@@ -289,13 +364,13 @@ export default function BookingPage() {
         </section>
       )}
 
-      {selected && (
+      {selected && terms && (
         <section className="rounded-2xl border border-brand-200 bg-brand-50 p-5">
-          <StepTitle n={4}>Confirm</StepTitle>
+          <StepTitle n={confirmStep}>Confirm</StepTitle>
           <dl className="mt-4 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
             <div>
               <dt className="text-slate-500">Service</dt>
-              <dd className="font-medium text-slate-900">{service.name}</dd>
+              <dd className="font-medium text-slate-900">{style ? `${service.name} · ${style.name}` : service.name}</dd>
             </div>
             <div>
               <dt className="text-slate-500">Specialist</dt>
@@ -308,8 +383,10 @@ export default function BookingPage() {
               </dd>
             </div>
             <div>
-              <dt className="text-slate-500">Price</dt>
-              <dd className="font-medium text-slate-900">{service.price} ETB</dd>
+              <dt className="text-slate-500">Duration and price</dt>
+              <dd className="font-medium text-slate-900">
+                {terms.durationMinutes} min · {terms.price} ETB
+              </dd>
             </div>
           </dl>
           <textarea

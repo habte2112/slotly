@@ -123,7 +123,8 @@ export default function Reschedule() {
         </Link>
         <h1 className="mt-2 text-3xl font-bold text-gray-900">Reschedule</h1>
         <p className="text-gray-600">
-          {booking.service.name} with {booking.provider.user.name}
+          {booking.variant ? `${booking.service.name} · ${booking.variant.name}` : booking.service.name} with{" "}
+          {booking.provider.user.name}
         </p>
         <p className="text-sm text-gray-500">Current time: {formatter.format(new Date(booking.startAt))}</p>
       </div>
