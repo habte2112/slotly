@@ -6,6 +6,7 @@ import { loadAvailability } from "../services/availability.service";
 const querySchema = z.object({
   date: z.string().refine(isValidDateString, "date must be a valid YYYY-MM-DD"),
   serviceId: z.string().min(1),
+  variantId: z.string().min(1).optional(),
 });
 
 export async function getAvailability(req: Request, res: Response) {
@@ -17,18 +18,20 @@ export async function getAvailability(req: Request, res: Response) {
     });
     return;
   }
-  const { date, serviceId } = parsed.data;
+  const { date, serviceId, variantId } = parsed.data;
 
-  const result = await loadAvailability(String(req.params.id), serviceId, date);
-  if (!result) {
-    res.status(404).json({ message: "Provider does not offer this service" });
+  const result = await loadAvailability(String(req.params.id), serviceId, date, variantId);
+  if (!result.ok) {
+    res.status(result.status).json({ message: result.message });
     return;
   }
 
   res.json({
     date,
     timezone: TIMEZONE,
-    durationMinutes: result.service.durationMinutes,
+    durationMinutes: result.offering.durationMinutes,
+    price: result.offering.price,
+    variant: result.offering.variant,
     slots: result.slots.map((s) => ({
       start: s.start.toISOString(),
       end: s.end.toISOString(),

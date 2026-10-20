@@ -19,6 +19,13 @@ export async function listServices(_req: Request, res: Response) {
   const services = await prisma.service.findMany({
     where: { isActive: true },
     orderBy: { name: "asc" },
+    include: {
+      variants: {
+        where: { isActive: true },
+        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+        select: { id: true, name: true, description: true, durationMinutes: true, price: true, imageUrl: true },
+      },
+    },
   });
   res.json({ services });
 }

@@ -716,4 +716,198 @@ describeDb("Slotly API", () => {
       ).rejects.toThrow();
     }, 60_000);
   });
+
+  describe("service variants (API)", () => {
+    const DATE_G = addDays(DATE_A, 49);
+    const DATE_H = addDays(DATE_A, 56);
+    let styledId = "";
+    let plainId = "";
+    let fadeId = "";
+    let kidsId = "";
+    let hiddenId = "";
+    let providerBId = "";
+    let aBookingId = "";
+
+    const bookStyle = (token: string, pid: string, startAt: string, sid: string, variantId?: string) =>
+      request(app)
+        .post("/api/bookings")
+        .set(bearer(token))
+        .send({ providerId: pid, serviceId: sid, startAt, variantId });
+
+    const availabilityFor = (pid: string, date: string, sid: string, variantId?: string) =>
+      request(app)
+        .get(`/api/providers/${pid}/availability`)
+        .query({ date, serviceId: sid, ...(variantId ? { variantId } : {}) });
+
+    beforeAll(async () => {
+      const passwordHash = await bcrypt.hash(PASSWORD, 4);
+      const userB = await prisma.user.create({
+        data: { name: "provider2", email: email("provider2"), passwordHash, role: "PROVIDER" },
+      });
+      const providerB = await prisma.provider.create({ data: { userId: userB.id, bio: "Second provider" } });
+      providerBId = providerB.id;
+      await prisma.workingHour.create({
+        data: { providerId: providerBId, dayOfWeek: 1, startTime: "08:00", endTime: "17:00" },
+      });
+
+      const styled = await prisma.service.create({
+        data: { name: `Test styles ${tag}`, durationMinutes: 30, price: 100 },
+      });
+      const plain = await prisma.service.create({
+        data: { name: `Test plain ${tag}`, durationMinutes: 30, price: 100 },
+      });
+      styledId = styled.id;
+      plainId = plain.id;
+
+      const fade = await prisma.serviceVariant.create({
+        data: { serviceId: styledId, name: "Fade", durationMinutes: 45, price: 400, sortOrder: 1 },
+      });
+      const kids = await prisma.serviceVariant.create({
+        data: { serviceId: styledId, name: "Kids cut", durationMinutes: 30, price: 250, sortOrder: 2 },
+      });
+      const hidden = await prisma.serviceVariant.create({
+        data: { serviceId: styledId, name: "Hidden", durationMinutes: 30, price: 999, isActive: false },
+      });
+      fadeId = fade.id;
+      kidsId = kids.id;
+      hiddenId = hidden.id;
+
+      await prisma.providerService.createMany({
+        data: [
+          { providerId, serviceId: styledId },
+          { providerId: providerBId, serviceId: styledId },
+          { providerId, serviceId: plainId },
+        ],
+      });
+      await prisma.providerVariant.createMany({
+        data: [
+          // Selam ለ Fade የራሷ ዋጋ እና ረዥም ጊዜ አላት
+          { providerId, variantId: fadeId, priceOverride: 450, durationOverride: 90 },
+          { providerId, variantId: hiddenId },
+          { providerId: providerBId, variantId: fadeId },
+          { providerId: providerBId, variantId: kidsId },
+        ],
+      });
+    }, 60_000);
+
+    it("lists only active styles in the service catalog", async () => {
+      const res = await request(app).get("/api/services");
+      expect(res.status).toBe(200);
+      const styled = res.body.services.find((s: { id: string }) => s.id === styledId);
+      expect(styled.variants.map((v: { name: string }) => v.name)).toEqual(["Fade", "Kids cut"]);
+      const plain = res.body.services.find((s: { id: string }) => s.id === plainId);
+      expect(plain.variants).toEqual([]);
+    });
+
+    it("lists the specialists for a style with their own price and duration", async () => {
+      const res = await request(app).get("/api/providers").query({ serviceId: styledId, variantId: fadeId });
+      expect(res.status).toBe(200);
+      const find = (id: string) => res.body.providers.find((p: { id: string }) => p.id === id);
+      const fadeOf = (p: { variants: { id: string }[] }) => p.variants.find((v) => v.id === fadeId);
+
+      expect(fadeOf(find(providerId))).toMatchObject({ price: 450, durationMinutes: 90 });
+      expect(fadeOf(find(providerBId))).toMatchObject({ price: 400, durationMinutes: 45 });
+      expect(find(providerId).variants.map((v: { id: string }) => v.id)).not.toContain(hiddenId);
+
+      const kids = await request(app).get("/api/providers").query({ serviceId: styledId, variantId: kidsId });
+      const ids = kids.body.providers.map((p: { id: string }) => p.id);
+      expect(ids).toContain(providerBId);
+      expect(ids).not.toContain(providerId);
+    });
+
+    it("calculates availability from the style's duration and the specialist's override", async () => {
+      const a = await availabilityFor(providerId, DATE_G, styledId, fadeId);
+      expect(a.status).toBe(200);
+      expect(a.body).toMatchObject({ durationMinutes: 90, price: 450 });
+      expect(a.body.variant).toMatchObject({ id: fadeId, name: "Fade" });
+      expect(a.body.slots).toHaveLength(16); // 08:00 - 15:30
+      expect(a.body.slots[15].label).toBe("15:30");
+
+      const b = await availabilityFor(providerBId, DATE_G, styledId, fadeId);
+      expect(b.body).toMatchObject({ durationMinutes: 45, price: 400 });
+      expect(b.body.slots).toHaveLength(17); // 08:00 - 16:00
+      expect(b.body.slots[16].label).toBe("16:00");
+    });
+
+    it("requires a style when the service has styles, and rejects unknown ones", async () => {
+      expect((await bookStyle(customer1Token, providerId, at(DATE_G, "09:00"), styledId)).status).toBe(400);
+      expect((await availabilityFor(providerId, DATE_G, styledId)).status).toBe(400);
+
+      // Selam "Kids cut" አትሰጥም
+      expect((await bookStyle(customer1Token, providerId, at(DATE_G, "09:00"), styledId, kidsId)).status).toBe(404);
+      // የተደበቀ ዘይቤ
+      expect((await bookStyle(customer1Token, providerId, at(DATE_G, "09:00"), styledId, hiddenId)).status).toBe(404);
+      // ዘይቤ በሌለው አገልግሎት ላይ ዘይቤ መላክ
+      expect((await bookStyle(customer1Token, providerId, at(DATE_H, "08:00"), plainId, fadeId)).status).toBe(400);
+
+      // ዘይቤ የሌለው አገልግሎት እንደ ድሮው ይያዛል
+      const plain = await bookStyle(customer1Token, providerId, at(DATE_H, "08:00"), plainId);
+      expect(plain.status).toBe(201);
+      expect(plain.body.booking.variant).toBeNull();
+      expect(plain.body.booking.priceAtBooking).toBe(100);
+    });
+
+    it("books a style with the specialist's own price and duration", async () => {
+      const a = await bookStyle(customer1Token, providerId, at(DATE_G, "09:00"), styledId, fadeId);
+      expect(a.status).toBe(201);
+      expect(a.body.booking.priceAtBooking).toBe(450);
+      expect(a.body.booking.variant).toMatchObject({ id: fadeId, name: "Fade" });
+      expect(a.body.booking.endAt).toBe(at(DATE_G, "10:30")); // 90 ደቂቃ
+      aBookingId = a.body.booking.id;
+
+      const b = await bookStyle(customer2Token, providerBId, at(DATE_G, "09:00"), styledId, fadeId);
+      expect(b.status).toBe(201);
+      expect(b.body.booking.priceAtBooking).toBe(400);
+      expect(b.body.booking.endAt).toBe(at(DATE_G, "09:45")); // 45 ደቂቃ
+    });
+
+    it("blocks every slot covered by the style's full duration", async () => {
+      const res = await availabilityFor(providerId, DATE_G, plainId);
+      expect(res.status).toBe(200);
+      const labels: string[] = res.body.slots.map((s: { label: string }) => s.label);
+      expect(labels).not.toContain("09:00");
+      expect(labels).not.toContain("09:30");
+      expect(labels).not.toContain("10:00");
+      expect(labels).toContain("08:30");
+      expect(labels).toContain("10:30");
+    });
+
+    it("keeps the booked price when the style price changes later", async () => {
+      await prisma.serviceVariant.update({ where: { id: fadeId }, data: { price: 500 } });
+      try {
+        const mine = await request(app).get("/api/bookings/my").set(bearer(customer1Token));
+        const row = mine.body.bookings.find((b: { id: string }) => b.id === aBookingId);
+        expect(row.priceAtBooking).toBe(450);
+      } finally {
+        await prisma.serviceVariant.update({ where: { id: fadeId }, data: { price: 400 } });
+      }
+    });
+
+    it("reschedules a style booking keeping its own length", async () => {
+      const slots = await request(app)
+        .get(`/api/bookings/${aBookingId}/availability`)
+        .query({ date: DATE_G })
+        .set(bearer(customer1Token));
+      expect(slots.status).toBe(200);
+      expect(slots.body.slots).toHaveLength(16); // የራሱ ቀጠሮ አይቆጠርም፣ 90 ደቂቃ ርዝመት
+
+      const moved = await request(app)
+        .patch(`/api/bookings/${aBookingId}/reschedule`)
+        .set(bearer(customer1Token))
+        .send({ startAt: at(DATE_G, "11:00") });
+      expect(moved.status).toBe(200);
+      expect(moved.body.booking.endAt).toBe(at(DATE_G, "12:30"));
+      expect(moved.body.booking.priceAtBooking).toBe(450);
+      expect(moved.body.booking.variant.name).toBe("Fade");
+    });
+
+    it("drops a specialist's styles when the service is removed from them", async () => {
+      const res = await request(app)
+        .put(`/api/providers/${providerBId}/services`)
+        .set(bearer(adminToken))
+        .send({ serviceIds: [] });
+      expect(res.status).toBe(200);
+      expect(await prisma.providerVariant.count({ where: { providerId: providerBId } })).toBe(0);
+    });
+  });
 });

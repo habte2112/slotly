@@ -46,11 +46,11 @@ model Provider {
   bio      String?
   photoUrl String?
 
-  services         ProviderService[]
-  workingHours     WorkingHour[]
-  timeOff          TimeOff[]
-  bookings         Booking[]
-  providerVariants ProviderVariant[]
+  services     ProviderService[]
+  workingHours WorkingHour[]
+  timeOff      TimeOff[]
+  bookings     Booking[]
+  variants     ProviderVariant[]
 }
 
 model Service {
@@ -168,7 +168,6 @@ model ProviderVariant {
   variantId        String
   provider         Provider       @relation(fields: [providerId], references: [id], onDelete: Cascade)
   variant          ServiceVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
-  // ባለሙያው ለዚህ ዘይቤ የራሱ ዋጋ ወይም ጊዜ ካለው፤ ባዶ ከሆነ የዘይቤው ነባሪ ይጠቅማል
   priceOverride    Int?
   durationOverride Int?
   user             User?          @relation(fields: [userId], references: [id])

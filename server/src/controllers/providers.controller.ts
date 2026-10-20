@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
+import { resolveTerms } from "../services/variants";
 
 const providerSelect = {
   id: true,
@@ -10,28 +11,82 @@ const providerSelect = {
   services: {
     select: { service: { select: { id: true, name: true, durationMinutes: true, price: true } } },
   },
+  variants: {
+    select: {
+      priceOverride: true,
+      durationOverride: true,
+      variant: {
+        select: {
+          id: true,
+          serviceId: true,
+          name: true,
+          description: true,
+          durationMinutes: true,
+          price: true,
+          imageUrl: true,
+          sortOrder: true,
+          isActive: true,
+        },
+      },
+    },
+  },
 } as const;
 
-function format(p: {
+interface ProviderRow {
   id: string;
   bio: string | null;
   photoUrl: string | null;
   user: { name: string };
   services: { service: { id: string; name: string; durationMinutes: number; price: number } }[];
-}) {
+  variants: {
+    priceOverride: number | null;
+    durationOverride: number | null;
+    variant: {
+      id: string;
+      serviceId: string;
+      name: string;
+      description: string | null;
+      durationMinutes: number;
+      price: number;
+      imageUrl: string | null;
+      sortOrder: number;
+      isActive: boolean;
+    };
+  }[];
+}
+
+function format(p: ProviderRow) {
   return {
     id: p.id,
     name: p.user.name,
     bio: p.bio,
     photoUrl: p.photoUrl,
     services: p.services.map((s) => s.service),
+    // ባለሙያው ለእያንዳንዱ ዘይቤ የራሱ ዋጋ እና ጊዜ ካለው ተተግብሮ ይታያል
+    variants: p.variants
+      .filter((v) => v.variant.isActive)
+      .sort((a, b) => a.variant.sortOrder - b.variant.sortOrder || a.variant.name.localeCompare(b.variant.name))
+      .map((v) => ({
+        id: v.variant.id,
+        serviceId: v.variant.serviceId,
+        name: v.variant.name,
+        description: v.variant.description,
+        imageUrl: v.variant.imageUrl,
+        ...resolveTerms(v.variant, v),
+      })),
   };
 }
 
 export async function listProviders(req: Request, res: Response) {
   const serviceId = typeof req.query.serviceId === "string" ? req.query.serviceId : undefined;
+  const variantId = typeof req.query.variantId === "string" ? req.query.variantId : undefined;
+
   const providers = await prisma.provider.findMany({
-    where: serviceId ? { services: { some: { serviceId } } } : undefined,
+    where: {
+      ...(serviceId ? { services: { some: { serviceId } } } : {}),
+      ...(variantId ? { variants: { some: { variantId, variant: { isActive: true } } } } : {}),
+    },
+    orderBy: { user: { name: "asc" } },
     select: providerSelect,
   });
   res.json({ providers: providers.map(format) });
@@ -106,6 +161,10 @@ export async function setProviderServices(req: Request, res: Response) {
   const updated = await prisma.$transaction(async (tx) => {
     await tx.providerService.deleteMany({ where: { providerId } });
     await tx.providerService.createMany({ data: serviceIds.map((serviceId) => ({ providerId, serviceId })) });
+    // ባለሙያው ከአሁን በኋላ የማይሰጠው አገልግሎት ዘይቤዎች ይወገዳሉ
+    await tx.providerVariant.deleteMany({
+      where: { providerId, variant: { serviceId: { notIn: serviceIds } } },
+    });
     return tx.provider.findUniqueOrThrow({ where: { id: providerId }, select: providerSelect });
   });
   res.json({ provider: format(updated) });
