@@ -322,6 +322,48 @@ export const updateStyle = (
     body: JSON.stringify(patch),
   }).then((r) => r.variant);
 
+  // ---- Style images (Cloudinary signed upload) ----
+interface UploadSignature {
+  cloudName: string;
+  apiKey: string;
+  timestamp: number;
+  folder: string;
+  allowedFormats: string;
+  signature: string;
+}
+
+export const setStyleImage = (id: string, imageUrl: string | null) =>
+  request<{ id: string; imageUrl: string | null }>(`/admin/variants/${id}/image`, {
+    method: "PUT",
+    body: JSON.stringify({ imageUrl }),
+  });
+
+export async function uploadStyleImage(file: File): Promise<string> {
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    throw new Error("JPG, PNG or WebP only");
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    throw new Error("Image must be under 2 MB");
+  }
+  const s = await request<UploadSignature>("/admin/uploads/sign", { method: "POST" });
+
+  const form = new FormData();
+  form.append("file", file);
+  form.append("api_key", s.apiKey);
+  form.append("timestamp", String(s.timestamp));
+  form.append("signature", s.signature);
+  form.append("folder", s.folder);
+  form.append("allowed_formats", s.allowedFormats);
+
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${s.cloudName}/image/upload`, {
+    method: "POST",
+    body: form,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error?.message ?? "Upload failed");
+  return data.secure_url as string;
+}
+
 export interface AdminProvider {
   id: string;
   name: string;

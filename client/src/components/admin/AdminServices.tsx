@@ -5,6 +5,8 @@ import {
   getAdminServices,
   updateService,
   updateStyle,
+  setStyleImage,
+  uploadStyleImage,
   type AdminService,
   type AdminStyle,
 } from "../../lib/api";
@@ -18,6 +20,8 @@ function StyleRow({
   onChange: (s: AdminStyle) => void;
   onError: (message: string) => void;
 }) {
+  const [uploading, setUploading] = useState(false);
+
   async function toggle() {
     try {
       onChange({ ...style, ...(await updateStyle(style.id, { isActive: !style.isActive })) });
@@ -26,15 +30,63 @@ function StyleRow({
     }
   }
 
+  async function onFile(file: File | undefined) {
+    if (!file) return;
+    setUploading(true);
+    onError("");
+    try {
+      const url = await uploadStyleImage(file);
+      const saved = await setStyleImage(style.id, url);
+      onChange({ ...style, imageUrl: saved.imageUrl });
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Could not upload image");
+    } finally {
+      setUploading(false);
+    }
+  }
+
   return (
     <li className="flex items-center justify-between gap-3 border-t border-slate-100 py-2 text-sm">
-      <span className={style.isActive ? "text-slate-900" : "text-slate-400 line-through"}>
-        {style.name} · {style.durationMinutes} min · {style.price} ETB
-        {!style.isActive && " (hidden)"}
-      </span>
-      <button onClick={toggle} className="rounded-lg border border-slate-300 px-2 py-1 hover:bg-slate-100">
-        {style.isActive ? "Hide" : "Show"}
-      </button>
+      <div className="flex items-center gap-3">
+        {style.imageUrl ? (
+          <img
+            src={style.imageUrl}
+            alt=""
+            loading="lazy"
+            className="h-10 w-14 rounded object-cover"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+        ) : (
+          <div className="h-10 w-14 rounded bg-slate-100" />
+        )}
+        <span className={style.isActive ? "text-slate-900" : "text-slate-400 line-through"}>
+          {style.name} · {style.durationMinutes} min · {style.price} ETB
+          {!style.isActive && " (hidden)"}
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <label
+          className={`cursor-pointer rounded-lg border border-slate-300 px-2 py-1 hover:bg-slate-100 ${
+            uploading ? "pointer-events-none opacity-50" : ""
+          }`}
+        >
+          {uploading ? "Uploading..." : "Image"}
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              void onFile(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+        </label>
+        <button onClick={toggle} className="rounded-lg border border-slate-300 px-2 py-1 hover:bg-slate-100">
+          {style.isActive ? "Hide" : "Show"}
+        </button>
+      </div>
     </li>
   );
 }
