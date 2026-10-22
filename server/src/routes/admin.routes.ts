@@ -8,6 +8,7 @@ import {
 } from "../controllers/admin.controller";
 import { authenticate, requireRole } from "../middleware/auth";
 import { createVariant, updateVariant, setProviderVariants } from "../controllers/admin-variants.controller";
+import { getUploadSignature, setVariantImage } from "../controllers/admin-images.controller";
 
 export const adminRouter = Router();
 
@@ -21,3 +22,5 @@ adminRouter.post("/providers", createProviderByEmail);
 adminRouter.post("/services/:serviceId/variants", createVariant);
 adminRouter.patch("/variants/:id", updateVariant);
 adminRouter.put("/providers/:id/variants", setProviderVariants);
+adminRouter.post("/uploads/sign", getUploadSignature);
+adminRouter.put("/variants/:id/image", setVariantImage);
