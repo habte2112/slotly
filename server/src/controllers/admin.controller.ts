@@ -38,7 +38,7 @@ export async function getStats(req: Request, res: Response) {
       },
       take: MAX_ROWS,
     }),
-    prisma.user.groupBy({ by: ["role"], _count: { _all: true } }),
+    prisma.user.groupBy({ by: ["role"], where: { isGuest: false }, _count: { _all: true } }),
     prisma.booking.count({
       where: { startAt: { gt: new Date() }, status: { in: ["PENDING", "CONFIRMED"] } },
     }),
@@ -54,6 +54,7 @@ export async function getStats(req: Request, res: Response) {
   let scheduled = 0;
   let completed = 0;
   let cancelled = 0;
+  let noShow = 0;
   let revenue = 0;
 
   for (const b of bookings) {
@@ -62,6 +63,10 @@ export async function getStats(req: Request, res: Response) {
       cancelled++;
       if (day) day.cancelled++;
       continue;
+    }
+    if (b.status === "NO_SHOW") {
+      noShow++;
+      continue; // ገቢ ወይም "scheduled" ውስጥ አይቆጠርም
     }
     if (day) day.bookings++;
     if (b.status === "COMPLETED") completed++;
@@ -83,7 +88,8 @@ export async function getStats(req: Request, res: Response) {
   }
 
   const active = scheduled + completed;
-  const all = active + cancelled;
+  const all = active + cancelled + noShow;
+  const attended = completed + noShow; // ውጤታቸው የታወቀ ቀጠሮዎች
 
   res.json({
     days,
@@ -97,6 +103,8 @@ export async function getStats(req: Request, res: Response) {
       cancelled,
       revenue,
       cancellationRate: all > 0 ? cancelled / all : 0,
+      noShow,
+      noShowRate: attended > 0 ? noShow / attended : 0,
     },
     upcoming,
     users,

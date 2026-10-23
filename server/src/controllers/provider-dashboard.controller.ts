@@ -3,6 +3,11 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { AuthRequest } from "../middleware/auth";
 import { notifyBooking } from "../services/email.service";
+import bcrypt from "bcrypt";
+import { randomBytes } from "node:crypto";
+import { loadAvailability } from "../services/availability.service";
+import { normalizePhone } from "../services/phone";
+import { isOverlapError } from "./bookings.controller";
 
 async function getOwnProvider(req: AuthRequest, res: Response) {
   const provider = await prisma.provider.findUnique({
@@ -214,4 +219,85 @@ export async function updateBookingStatus(req: AuthRequest, res: Response) {
   });
     if (parsed.data.status === "CANCELLED") notifyBooking("cancelled_by_provider", updated.id);
   res.json({ booking: updated });
+}
+
+const OFFSET_MS = 3 * 60 * 60 * 1000; // Africa/Addis_Ababa (UTC+3)
+const localDate = (d: Date) => new Date(d.getTime() + OFFSET_MS).toISOString().slice(0, 10);
+
+const manualSchema = z.object({
+  customerName: z.string().trim().min(2).max(80),
+  customerPhone: z.string().trim().min(7).max(25),
+  serviceId: z.string().min(1),
+  variantId: z.string().min(1).optional(),
+  startAt: isoDate,
+  notes: z.string().trim().max(500).optional(),
+});
+
+// ባለሙያው ለስልክ ወይም ለቀጥታ ደንበኛ ቀጠሮ ይመዘግባል (ደንበኛው መለያ አያስፈልገውም)
+export async function createManualBooking(req: AuthRequest, res: Response) {
+  const parsed = manualSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: parsed.error.issues[0]?.message ?? "Invalid input" });
+    return;
+  }
+  const phone = normalizePhone(parsed.data.customerPhone);
+  if (!phone) {
+    res.status(400).json({ message: "Please enter a valid phone number" });
+    return;
+  }
+
+  const provider = await getOwnProvider(req, res);
+  if (!provider) return;
+
+  const { customerName, serviceId, variantId, notes } = parsed.data;
+  const startAt = new Date(parsed.data.startAt);
+
+  const availability = await loadAvailability(provider.id, serviceId, localDate(startAt), variantId);
+  if (!availability.ok) {
+    res.status(availability.status).json({ message: availability.message });
+    return;
+  }
+  if (!availability.slots.some((s) => s.start.getTime() === startAt.getTime())) {
+    res.status(409).json({ message: "This time slot is not available" });
+    return;
+  }
+  const { offering } = availability;
+  const endAt = new Date(startAt.getTime() + offering.durationMinutes * 60 * 1000);
+
+  // ቋሚ ደንበኛ በስልክ ቁጥሩ ይታወቃል፤ ከሌለ አዲስ "እንግዳ" ይፈጠራል (መግባት አይችልም፣ ኢሜይል የለውም)
+  let guest = await prisma.user.findFirst({ where: { isGuest: true, phone } });
+  if (!guest) {
+    guest = await prisma.user.create({
+      data: {
+        name: customerName,
+        email: `guest-${randomBytes(8).toString("hex")}@guest.slotly.invalid`,
+        phone,
+        passwordHash: await bcrypt.hash(randomBytes(16).toString("hex"), 10),
+        isGuest: true,
+      },
+    });
+  }
+
+  try {
+    const booking = await prisma.booking.create({
+      data: {
+        customerId: guest.id,
+        providerId: provider.id,
+        serviceId,
+        variantId: offering.variant?.id,
+        startAt,
+        endAt,
+        notes,
+        priceAtBooking: offering.price,
+      },
+      select: providerBookingSelect,
+    });
+    res.status(201).json({ booking });
+  } catch (error) {
+    if (isOverlapError(error)) {
+      res.status(409).json({ message: "This time slot was just taken" });
+      return;
+    }
+    throw error;
+  }
 }

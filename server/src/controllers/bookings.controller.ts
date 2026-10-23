@@ -44,7 +44,7 @@ const bookingSelect = {
 } as const;
 
 // የ PostgreSQL exclusion constraint ጥሰትን (23P01) በተለያዩ የስህተት ቅርጾች ውስጥ ይፈልጋል
-function isOverlapError(error: unknown): boolean {
+export function isOverlapError(error: unknown): boolean {
   const seen = new Set<unknown>();
   let current: any = error;
   while (current && typeof current === "object" && !seen.has(current)) {

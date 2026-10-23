@@ -30,7 +30,7 @@ interface BookingForEmail {
   startAt: Date;
   endAt: Date;
   priceAtBooking: number | null;
-  customer: { name: string; email: string };
+  customer: { name: string; email: string; isGuest: boolean };
   provider: { user: { name: string } };
   service: { name: string; durationMinutes: number; price: number };
   variant: { name: string } | null;
@@ -51,6 +51,7 @@ async function loadBooking(
         select: {
           name: true,
           email: true,
+          isGuest: true,
         },
       },
       provider: {
@@ -216,6 +217,9 @@ export async function sendBookingEmail(
       return false;
     }
 
+        // ባለሙያው የመዘገባቸው እንግዳ ደንበኞች ኢሜይል የላቸውም
+    if (booking.customer.isGuest) return false;
+
     const { subject, heading, intro } = describe(
       kind,
       booking
@@ -301,6 +305,7 @@ export async function processReminders(minAgeMinutes = 120, now = new Date()) {
     where: {
       status: { in: ["PENDING", "CONFIRMED"] },
       reminderSentAt: null,
+      customer: { isGuest: false },
       startAt: { gt: now, lte: new Date(now.getTime() + DAY_MS) },
       // ገና የተያዘ ቀጠሮ ወዲያው ማሳሰቢያ እንዳያገኝ
       createdAt: { lt: new Date(now.getTime() - minAgeMinutes * 60 * 1000) },

@@ -1171,5 +1171,75 @@ describeDb("Slotly API", () => {
         .send({ rating: 5 });
       expect(res.status).toBe(400);
     });
+    it("counts no-shows separately in the admin statistics (not as revenue)", async () => {
+      const res = await request(app).get("/api/admin/stats").query({ days: 30 }).set(bearer(adminToken));
+      expect(res.status).toBe(200);
+      expect(res.body.totals.noShow).toBeGreaterThanOrEqual(1);
+      expect(res.body.totals.noShowRate).toBeGreaterThan(0);
+      expect(res.body.totals.noShowRate).toBeLessThanOrEqual(1);
+    });
+  });
+
+  describe("manual bookings for phone and walk-in customers", () => {
+    const DATE_I = addDays(DATE_A, 63);
+    const digits = String(10000000 + Math.floor(Math.random() * 89999999));
+    const PHONE_LOCAL = `09${digits}`;
+    const PHONE_INTL = `+2519${digits}`;
+
+    const manual = (token: string, body: object) =>
+      request(app).post("/api/provider/bookings").set(bearer(token)).send(body);
+    const base = (time: string, extra: object = {}) => ({
+      customerName: "Walk In",
+      customerPhone: PHONE_LOCAL,
+      serviceId,
+      startAt: at(DATE_I, time),
+      ...extra,
+    });
+
+    afterAll(async () => {
+      const guests = await prisma.user.findMany({ where: { isGuest: true, phone: PHONE_INTL }, select: { id: true } });
+      const ids = guests.map((g) => g.id);
+      await prisma.booking.deleteMany({ where: { customerId: { in: ids } } });
+      await prisma.user.deleteMany({ where: { id: { in: ids } } });
+    }, 60_000);
+
+    it("is for specialists only", async () => {
+      expect((await manual(customer1Token, base("13:00"))).status).toBe(403);
+      expect((await request(app).post("/api/provider/bookings").send(base("13:00"))).status).toBe(401);
+    });
+
+    it("books a customer without an account and takes the slot", async () => {
+      const res = await manual(providerToken, base("13:00", { notes: "regular" }));
+      expect(res.status).toBe(201);
+      expect(res.body.booking).toMatchObject({
+        status: "CONFIRMED",
+        priceAtBooking: 100,
+        customer: { name: "Walk In", phone: PHONE_INTL },
+      });
+
+      const starts: string[] = (await availability(DATE_I)).body.slots.map((s: { start: string }) => s.start);
+      expect(starts).not.toContain(at(DATE_I, "13:00"));
+
+      expect((await manual(providerToken, base("13:00"))).status).toBe(409);
+    });
+
+    it("recognises the same customer by phone number in any format", async () => {
+      const res = await manual(providerToken, base("14:00", { customerName: "Someone Else", customerPhone: PHONE_INTL }));
+      expect(res.status).toBe(201);
+      expect(await prisma.user.count({ where: { isGuest: true, phone: PHONE_INTL } })).toBe(1);
+      expect(res.body.booking.customer.name).toBe("Walk In"); // የመጀመሪያው ስም ይቀራል
+    });
+
+    it("validates the input", async () => {
+      expect((await manual(providerToken, base("15:00", { customerPhone: "abc" }))).status).toBe(400);
+      expect((await manual(providerToken, base("15:00", { customerName: "x" }))).status).toBe(400);
+      expect((await manual(providerToken, base("20:00"))).status).toBe(409); // ከስራ ሰዓት ውጭ
+      expect((await manual(providerToken, base("15:00", { serviceId: "no-such-service" }))).status).toBe(404);
+    });
+
+    it("never sends reminders to guests", async () => {
+      const res = await request(app).post("/api/internal/send-reminders").set(bearer(process.env.CRON_SECRET!));
+      expect(res.status).toBe(200);
+    });
   });
 });
