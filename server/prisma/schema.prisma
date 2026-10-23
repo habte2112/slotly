@@ -19,6 +19,7 @@ enum BookingStatus {
   CONFIRMED
   CANCELLED
   COMPLETED
+  NO_SHOW
 }
 
 model User {
@@ -30,6 +31,7 @@ model User {
   role              Role      @default(CUSTOMER)
   createdAt         DateTime  @default(now())
   passwordChangedAt DateTime?
+  isGuest           Boolean   @default(false)
   reviews           Review[]
 
   provider            Provider?

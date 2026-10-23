@@ -12,6 +12,7 @@ const statusStyle: Record<ProviderBooking["status"], string> = {
   CONFIRMED: "bg-green-100 text-green-800",
   CANCELLED: "bg-gray-200 text-gray-600",
   COMPLETED: "bg-blue-100 text-blue-800",
+  NO_SHOW: "bg-red-100 text-red-800",
 };
 
 export default function ProviderBookings() {
@@ -40,8 +41,9 @@ export default function ProviderBookings() {
     setError("");
   }
 
-  async function onStatus(id: string, status: "COMPLETED" | "CANCELLED") {
+    async function onStatus(id: string, status: "COMPLETED" | "CANCELLED" | "NO_SHOW") {
     if (status === "CANCELLED" && !window.confirm("Cancel this booking?")) return;
+    if (status === "NO_SHOW" && !window.confirm("Mark this customer as a no-show?")) return;
     setBusyId(id);
     setError("");
     try {
@@ -91,14 +93,35 @@ export default function ProviderBookings() {
                   {b.status.toLowerCase()}
                 </span>
               </div>
-              {active && (
-                <button
-                  onClick={() => onStatus(b.id, started ? "COMPLETED" : "CANCELLED")}
-                  disabled={busyId === b.id}
-                  className="shrink-0 rounded-lg border border-gray-300 px-3 py-1 text-sm hover:bg-gray-100 disabled:opacity-50"
-                >
-                  {started ? "Mark completed" : "Cancel"}
-                </button>
+                          {active && (
+                <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+                  {started ? (
+                    <>
+                      <button
+                        onClick={() => onStatus(b.id, "COMPLETED")}
+                        disabled={busyId === b.id}
+                        className="rounded-lg border border-gray-300 px-3 py-1 text-sm hover:bg-gray-100 disabled:opacity-50"
+                      >
+                        Mark completed
+                      </button>
+                      <button
+                        onClick={() => onStatus(b.id, "NO_SHOW")}
+                        disabled={busyId === b.id}
+                        className="rounded-lg border border-red-300 px-3 py-1 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        No-show
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => onStatus(b.id, "CANCELLED")}
+                      disabled={busyId === b.id}
+                      className="rounded-lg border border-gray-300 px-3 py-1 text-sm hover:bg-gray-100 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
               )}
             </li>
           );

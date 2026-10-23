@@ -21,6 +21,7 @@ const statusStyle: Record<Booking["status"], string> = {
   CONFIRMED: "bg-green-100 text-green-800",
   CANCELLED: "bg-slate-200 text-slate-600",
   COMPLETED: "bg-sky-100 text-sky-800",
+  NO_SHOW: "bg-red-100 text-red-800",
 };
 
 function ReviewForm({

@@ -1126,4 +1126,50 @@ describeDb("Slotly API", () => {
       expect((await request(app).get("/api/admin/reviews").set(bearer(customer1Token))).status).toBe(403);
     });
   });
+
+  describe("no-shows", () => {
+    let pastId = "";
+    let futureId = "";
+
+    beforeAll(async () => {
+      const c1 = await prisma.user.findUniqueOrThrow({ where: { email: email("customer1") } });
+      const make = (start: Date) =>
+        prisma.booking.create({
+          data: {
+            customerId: c1.id,
+            providerId,
+            serviceId,
+            startAt: start,
+            endAt: new Date(start.getTime() + 30 * 60 * 1000),
+            priceAtBooking: 100,
+            status: "CONFIRMED",
+          },
+        });
+      pastId = (await make(new Date(Date.now() - 10 * DAY_MS))).id;
+      futureId = (await make(new Date(at(addDays(DATE_A, 77), "09:00")))).id;
+    }, 60_000);
+
+    const mark = (id: string, token: string, status = "NO_SHOW") =>
+      request(app).patch(`/api/provider/bookings/${id}/status`).set(bearer(token)).send({ status });
+
+    it("lets only the specialist mark a started booking as a no-show", async () => {
+      expect((await mark(pastId, customer1Token)).status).toBe(403);
+      expect((await mark(futureId, providerToken)).status).toBe(409);
+
+      const res = await mark(pastId, providerToken);
+      expect(res.status).toBe(200);
+      expect(res.body.booking.status).toBe("NO_SHOW");
+
+      expect((await mark(pastId, providerToken)).status).toBe(409);
+      expect((await mark(pastId, providerToken, "BOGUS")).status).toBe(400);
+    });
+
+    it("does not let a no-show customer leave a review", async () => {
+      const res = await request(app)
+        .post(`/api/bookings/${pastId}/review`)
+        .set(bearer(customer1Token))
+        .send({ rating: 5 });
+      expect(res.status).toBe(400);
+    });
+  });
 });

@@ -50,7 +50,7 @@ export interface Booking {
   id: string;
   startAt: string;
   endAt: string;
-  status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
+  status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED" | "NO_SHOW";
   notes: string | null;
   priceAtBooking: number | null;
   provider: { id: string; user: { name: string } };
@@ -178,7 +178,7 @@ export interface ProviderBooking {
   id: string;
   startAt: string;
   endAt: string;
-  status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
+  status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED" | "NO_SHOW";
   notes: string | null;
   customer: { name: string; phone: string | null };
   service: { name: string; durationMinutes: number };
@@ -210,7 +210,7 @@ export const deleteTimeOff = (id: string) =>
 export const getProviderBookings = (scope: "upcoming" | "past") =>
   request<{ bookings: ProviderBooking[] }>(`/provider/bookings?scope=${scope}`).then((r) => r.bookings);
 
-export const updateProviderBookingStatus = (id: string, status: "COMPLETED" | "CANCELLED") =>
+export const updateProviderBookingStatus = (id: string, status: "COMPLETED" | "CANCELLED" | "NO_SHOW") =>
   request<{ booking: ProviderBooking }>(`/provider/bookings/${id}/status`, {
     method: "PATCH",
     body: JSON.stringify({ status }),

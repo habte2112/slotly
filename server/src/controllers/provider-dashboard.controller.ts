@@ -175,12 +175,12 @@ export async function listProviderBookings(req: AuthRequest, res: Response) {
   res.json({ bookings });
 }
 
-const statusSchema = z.object({ status: z.enum(["COMPLETED", "CANCELLED"]) });
+const statusSchema = z.object({ status: z.enum(["COMPLETED", "CANCELLED", "NO_SHOW"]) });
 
 export async function updateBookingStatus(req: AuthRequest, res: Response) {
   const parsed = statusSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ message: "Status must be COMPLETED or CANCELLED" });
+    res.status(400).json({ message: "Status must be COMPLETED, CANCELLED or NO_SHOW" });
     return;
   }
   const provider = await getOwnProvider(req, res);
@@ -198,8 +198,8 @@ export async function updateBookingStatus(req: AuthRequest, res: Response) {
   }
 
   const now = new Date();
-  if (parsed.data.status === "COMPLETED" && booking.startAt > now) {
-    res.status(409).json({ message: "Cannot complete a booking that has not started" });
+  if ((parsed.data.status === "COMPLETED" || parsed.data.status === "NO_SHOW") && booking.startAt > now) {
+    res.status(409).json({ message: "Cannot mark a booking that has not started yet" });
     return;
   }
   if (parsed.data.status === "CANCELLED" && booking.startAt <= now) {
