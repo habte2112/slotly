@@ -216,6 +216,19 @@ export const updateProviderBookingStatus = (id: string, status: "COMPLETED" | "C
     body: JSON.stringify({ status }),
   }).then((r) => r.booking);
 
+export const createManualBooking = (input: {
+  customerName: string;
+  customerPhone: string;
+  serviceId: string;
+  variantId?: string;
+  startAt: string;
+  notes?: string;
+}) =>
+  request<{ booking: ProviderBooking }>("/provider/bookings", {
+    method: "POST",
+    body: JSON.stringify(input),
+  }).then((r) => r.booking);
+
 // ---- Reschedule ----
 export const getRescheduleSlots = (bookingId: string, date: string) =>
   request<{ slots: Slot[] }>(`/bookings/${bookingId}/availability?date=${date}`).then((r) => r.slots);
@@ -249,6 +262,8 @@ export interface AdminStats {
     cancelled: number;
     revenue: number;
     cancellationRate: number;
+    noShow: number;
+    noShowRate: number;
   };
   upcoming: number;
   users: { customers: number; providers: number; admins: number };

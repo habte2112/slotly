@@ -89,7 +89,7 @@ export default function AdminBookings() {
                   {b.customer.name} ({b.customer.email})
                 </p>
                 <span className={`mt-2 inline-block rounded-full px-2 py-0.5 text-xs ${statusStyle[b.status]}`}>
-                  {b.status.toLowerCase()}
+                  {b.status === "NO_SHOW" ? "no-show" : b.status.toLowerCase()}
                 </span>
               </div>
               {active && scope === "upcoming" && (

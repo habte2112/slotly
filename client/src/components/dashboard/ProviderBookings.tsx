@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getProviderBookings, updateProviderBookingStatus, type ProviderBooking } from "../../lib/api";
+import ManualBookingForm from "./ManualBookingForm";
 
 const formatter = new Intl.DateTimeFormat("en-GB", {
   timeZone: "Africa/Addis_Ababa",
@@ -20,6 +21,8 @@ export default function ProviderBookings() {
   const [bookings, setBookings] = useState<ProviderBooking[] | null>(null);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -33,7 +36,7 @@ export default function ProviderBookings() {
     return () => {
       cancelled = true;
     };
-  }, [scope]);
+  }, [scope, reloadKey]);
 
   function changeScope(next: "upcoming" | "past") {
     setScope(next);
@@ -41,7 +44,15 @@ export default function ProviderBookings() {
     setError("");
   }
 
-    async function onStatus(id: string, status: "COMPLETED" | "CANCELLED" | "NO_SHOW") {
+  function onCreated() {
+    setShowForm(false);
+    setBookings(null);
+    setError("");
+    setScope("upcoming");
+    setReloadKey((k) => k + 1);
+  }
+
+  async function onStatus(id: string, status: "COMPLETED" | "CANCELLED" | "NO_SHOW") {
     if (status === "CANCELLED" && !window.confirm("Cancel this booking?")) return;
     if (status === "NO_SHOW" && !window.confirm("Mark this customer as a no-show?")) return;
     setBusyId(id);
@@ -58,19 +69,29 @@ export default function ProviderBookings() {
 
   return (
     <div>
-      <div className="flex gap-2">
-        {(["upcoming", "past"] as const).map((s) => (
-          <button
-            key={s}
-            onClick={() => changeScope(s)}
-            className={`rounded-lg border px-3 py-1 text-sm capitalize ${
-              scope === s ? "border-brand-700 bg-brand-700 text-white" : "border-gray-300 bg-white hover:bg-gray-100"
-            }`}
-          >
-            {s}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex gap-2">
+          {(["upcoming", "past"] as const).map((s) => (
+            <button
+              key={s}
+              onClick={() => changeScope(s)}
+              className={`rounded-lg border px-3 py-1 text-sm capitalize ${
+                scope === s ? "border-brand-700 bg-brand-700 text-white" : "border-gray-300 bg-white hover:bg-gray-100"
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => setShowForm((v) => !v)}
+          className="rounded-lg bg-brand-700 px-3 py-1 text-sm font-medium text-white hover:bg-brand-800"
+        >
+          + Add booking
+        </button>
       </div>
+
+      {showForm && <ManualBookingForm onCreated={onCreated} onClose={() => setShowForm(false)} />}
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
       {!bookings && !error && <p className="mt-4 text-gray-500">Loading...</p>}
@@ -90,10 +111,10 @@ export default function ProviderBookings() {
                 {b.customer.phone && <p className="text-sm text-gray-500">{b.customer.phone}</p>}
                 {b.notes && <p className="mt-1 text-sm italic text-gray-500">“{b.notes}”</p>}
                 <span className={`mt-2 inline-block rounded-full px-2 py-0.5 text-xs ${statusStyle[b.status]}`}>
-                  {b.status.toLowerCase()}
+                  {b.status === "NO_SHOW" ? "no-show" : b.status.toLowerCase()}
                 </span>
               </div>
-                          {active && (
+              {active && (
                 <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
                   {started ? (
                     <>
