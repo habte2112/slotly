@@ -3,7 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { env } from "../config/env";
 import { processReminders } from "../services/email.service";
-import { cleanupExpiredTokens } from "../services/maintenance.service";
+import { autoCompleteFinishedBookings, cleanupExpiredTokens } from "../services/maintenance.service";
 
 export const internalRouter = Router();
 
@@ -41,5 +41,13 @@ internalRouter.post("/send-reminders", async (req, res) => {
     console.error("[cleanup] failed:", err instanceof Error ? err.message : "unknown");
   }
 
-  res.json({ ...result, cleaned });
+    // ማጽዳቱ እና ይህ ቢከሽፉ ማሳሰቢያዎቹ አይነኩም
+  let autoCompleted = 0;
+  try {
+    autoCompleted = await autoCompleteFinishedBookings();
+  } catch (err) {
+    console.error("[auto-complete] failed:", err instanceof Error ? err.message : "unknown");
+  }
+
+    res.json({ ...result, cleaned, autoCompleted });
 });

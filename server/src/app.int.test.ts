@@ -1250,4 +1250,37 @@ describeDb("Slotly API", () => {
       expect(res.status).toBe(200);
     });
   });
+
+  describe("automatic completion", () => {
+    it("completes bookings that ended more than 24 hours ago and leaves the rest alone", async () => {
+      const c1 = await prisma.user.findUniqueOrThrow({ where: { email: email("customer1") } });
+      const make = (hoursAgo: number, status: "CONFIRMED" | "NO_SHOW") => {
+        const start = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
+        return prisma.booking.create({
+          data: {
+            customerId: c1.id,
+            providerId,
+            serviceId,
+            startAt: start,
+            endAt: new Date(start.getTime() + 30 * 60 * 1000),
+            priceAtBooking: 100,
+            status,
+          },
+        });
+      };
+      const old = await make(72, "CONFIRMED");
+      const recent = await make(2, "CONFIRMED");
+      const missed = await make(96, "NO_SHOW");
+
+      const res = await request(app).post("/api/internal/send-reminders").set(bearer(process.env.CRON_SECRET!));
+      expect(res.status).toBe(200);
+      expect(res.body.autoCompleted).toBeGreaterThanOrEqual(1);
+
+      const statusOf = async (id: string) =>
+        (await prisma.booking.findUniqueOrThrow({ where: { id }, select: { status: true } })).status;
+      expect(await statusOf(old.id)).toBe("COMPLETED");
+      expect(await statusOf(recent.id)).toBe("CONFIRMED"); // ገና 24 ሰዓት አልሞላም
+      expect(await statusOf(missed.id)).toBe("NO_SHOW"); // የተመዘገበ no-show አይለወጥም
+    }, 60_000);
+  });
 });
