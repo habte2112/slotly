@@ -62,7 +62,7 @@ export default function Overview() {
 
       {stats && (
         <div className="mt-4 space-y-6">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Card
               label="Bookings"
               value={String(stats.totals.bookings)}
@@ -73,6 +73,11 @@ export default function Overview() {
               label="Cancellation rate"
               value={`${(stats.totals.cancellationRate * 100).toFixed(1)}%`}
               hint={`${stats.totals.cancelled} cancelled`}
+            />
+            <Card
+              label="No-show rate"
+              value={`${(stats.totals.noShowRate * 100).toFixed(1)}%`}
+              hint={`${stats.totals.noShow} of ${stats.totals.completed + stats.totals.noShow} finished appointments`}
             />
             <Card label="Upcoming" value={String(stats.upcoming)} hint="Confirmed, from now on" />
           </div>
