@@ -5,7 +5,9 @@ import {
   createBooking,
   getAvailability,
   getProviders,
+  getRatingsSummary,
   getServices,
+  type RatingInfo,
   type Provider,
   type ProviderStyle,
   type Service,
@@ -17,6 +19,7 @@ import Avatar from "../components/ui/Avatar";
 import ServiceIcon from "../components/ui/ServiceIcon";
 import Skeleton from "../components/ui/Skeleton";
 import StyleImage from "../components/ui/StyleImage";
+import { RatingBadge } from "../components/ui/Rating";
 
 // የአዲስ አበባ የዛሬ ቀን (UTC+3)
 function todayInAddis(): string {
@@ -65,6 +68,7 @@ export default function BookingPage() {
 
   const [service, setService] = useState<Service | null>(null);
   const [providers, setProviders] = useState<Provider[] | null>(null);
+  const [ratings, setRatings] = useState<Record<string, RatingInfo>>({});
   const [loadError, setLoadError] = useState("");
 
   const [styleId, setStyleId] = useState("");
@@ -81,11 +85,16 @@ export default function BookingPage() {
   // አገልግሎቱን እና ባለሙያዎቹን ይጭናል
   useEffect(() => {
     let cancelled = false;
-    Promise.all([getServices(), getProviders(serviceId)])
-      .then(([services, provs]) => {
+        Promise.all([
+      getServices(),
+      getProviders(serviceId),
+      getRatingsSummary().catch((): Record<string, RatingInfo> => ({})),
+    ])
+      .then(([services, provs, rs]) => {
         if (cancelled) return;
         setService(services.find((s) => s.id === serviceId) ?? null);
         setProviders(provs);
+        setRatings(rs);
       })
       .catch((e) => {
         if (!cancelled) setLoadError(e.message);
@@ -275,26 +284,31 @@ export default function BookingPage() {
             {eligible.map((p) => {
               const own = hasStyles ? styleOf(p) : undefined;
               return (
-                <button
+                <div
                   key={p.id}
-                  onClick={() => chooseProvider(p.id)}
-                  className={`flex items-start gap-3 rounded-2xl border p-4 text-left transition ${
+                  className={`rounded-2xl border p-4 transition ${
                     providerId === p.id
                       ? "border-brand-600 bg-brand-50 ring-1 ring-brand-600"
                       : "border-slate-200 bg-white hover:border-brand-300"
                   }`}
                 >
-                  <Avatar name={p.name} className="h-11 w-11 text-base" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block font-medium text-slate-900">{p.name}</span>
-                    <span className="mt-0.5 block text-sm text-slate-600">{p.bio}</span>
-                    {own && (
-                      <span className="mt-2 block text-sm font-medium text-brand-700">
-                        {own.price} ETB · {own.durationMinutes} min
-                      </span>
-                    )}
-                  </span>
-                </button>
+                  <button onClick={() => chooseProvider(p.id)} className="flex w-full items-start gap-3 text-left">
+                    <Avatar name={p.name} className="h-11 w-11 text-base" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-medium text-slate-900">{p.name}</span>
+                      <RatingBadge info={ratings[p.id]} />
+                      <span className="mt-0.5 block text-sm text-slate-600">{p.bio}</span>
+                      {own && (
+                        <span className="mt-2 block text-sm font-medium text-brand-700">
+                          {own.price} ETB · {own.durationMinutes} min
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                  <Link to={`/specialists/${p.id}`} className="mt-2 inline-block text-xs text-slate-500 underline hover:text-slate-900">
+                    View profile and reviews
+                  </Link>
+                </div>
               );
             })}
           </div>

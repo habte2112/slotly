@@ -3,12 +3,14 @@ import Overview from "../components/admin/Overview";
 import AdminBookings from "../components/admin/AdminBookings";
 import AdminServices from "../components/admin/AdminServices";
 import AdminProviders from "../components/admin/AdminProviders";
+import AdminReviews from "../components/admin/AdminReviews";
 
 const TABS = [
   { id: "overview", label: "Overview" },
   { id: "bookings", label: "Bookings" },
   { id: "services", label: "Services" },
   { id: "specialists", label: "Specialists" },
+  { id: "reviews", label: "Reviews" },
 ] as const;
 
 export default function Admin() {
@@ -39,6 +41,7 @@ export default function Admin() {
         {tab === "bookings" && <AdminBookings />}
         {tab === "services" && <AdminServices />}
         {tab === "specialists" && <AdminProviders />}
+        {tab === "reviews" && <AdminReviews />}
       </div>
     </>
   );

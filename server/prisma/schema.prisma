@@ -30,6 +30,7 @@ model User {
   role              Role      @default(CUSTOMER)
   createdAt         DateTime  @default(now())
   passwordChangedAt DateTime?
+  reviews           Review[]
 
   provider            Provider?
   bookings            Booking[]            @relation("CustomerBookings")
@@ -40,11 +41,12 @@ model User {
 }
 
 model Provider {
-  id       String  @id @default(cuid())
-  userId   String  @unique
-  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id       String   @id @default(cuid())
+  userId   String   @unique
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   bio      String?
   photoUrl String?
+  reviews  Review[]
 
   services     ProviderService[]
   workingHours WorkingHour[]
@@ -109,6 +111,7 @@ model Booking {
   reminderSentAt DateTime?
   priceAtBooking Int?
   variantId      String?
+  review         Review?
 
   customer User            @relation("CustomerBookings", fields: [customerId], references: [id])
   provider Provider        @relation(fields: [providerId], references: [id])
@@ -175,4 +178,21 @@ model ProviderVariant {
 
   @@id([providerId, variantId])
   @@index([variantId])
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  bookingId  String   @unique
+  customerId String
+  providerId String
+  rating     Int
+  comment    String?
+  isHidden   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  booking  Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  customer User     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId, isHidden, createdAt])
 }

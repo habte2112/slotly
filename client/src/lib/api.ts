@@ -414,3 +414,57 @@ export const createTelegramLink = () =>
   request<{ url: string }>("/telegram/link", { method: "POST" }).then((r) => r.url);
 
 export const unlinkTelegram = () => request<{ success: boolean }>("/telegram/link", { method: "DELETE" });
+
+// ---- Reviews ----
+export interface RatingInfo {
+  average: number;
+  count: number;
+}
+
+export interface Review {
+  id: string;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+  author: string;
+}
+
+export const getProviderReviews = (providerId: string) =>
+  request<{ summary: RatingInfo; reviews: Review[] }>(`/providers/${providerId}/reviews`);
+
+export const getRatingsSummary = () =>
+  request<{ ratings: { providerId: string; average: number; count: number }[] }>("/reviews/summary").then(
+    (r) => {
+      const map: Record<string, RatingInfo> = {};
+      for (const x of r.ratings) map[x.providerId] = { average: x.average, count: x.count };
+      return map;
+    },
+  );
+
+export const getMyReviewedBookingIds = () =>
+  request<{ bookingIds: string[] }>("/reviews/mine").then((r) => r.bookingIds);
+
+export const createReview = (bookingId: string, rating: number, comment?: string) =>
+  request<{ review: { id: string } }>(`/bookings/${bookingId}/review`, {
+    method: "POST",
+    body: JSON.stringify({ rating, comment }),
+  });
+
+export interface AdminReview {
+  id: string;
+  rating: number;
+  comment: string | null;
+  isHidden: boolean;
+  createdAt: string;
+  customer: { name: string; email: string };
+  provider: { user: { name: string } };
+}
+
+export const getAdminReviews = () =>
+  request<{ reviews: AdminReview[] }>("/admin/reviews").then((r) => r.reviews);
+
+export const setReviewHidden = (id: string, isHidden: boolean) =>
+  request<{ review: { id: string; isHidden: boolean } }>(`/admin/reviews/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ isHidden }),
+  });

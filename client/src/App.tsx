@@ -12,6 +12,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
+import SpecialistProfile from "./pages/SpecialistProfile";
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/book/:serviceId" element={<BookingPage />} />
+      <Route path="/specialists/:id" element={<SpecialistProfile />} />
       <Route path="*" element={<NotFound />} />
 
       <Route element={<ProtectedRoute />}>

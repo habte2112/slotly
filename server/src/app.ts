@@ -12,6 +12,7 @@ import { providerDashboardRouter } from "./routes/provider-dashboard.routes";
 import { internalRouter } from "./routes/internal.routes";
 import { adminRouter } from "./routes/admin.routes";
 import { telegramRouter, telegramWebhookRouter } from "./routes/telegram.routes";
+import { reviewsRouter } from "./routes/reviews";
 
 export const app = express();
 
@@ -46,6 +47,7 @@ app.use("/api", apiLimiter);
 app.use("/api/auth", authRouter);
 app.use("/api/services", servicesRouter);
 app.use("/api/providers", providersRouter);
+app.use("/api/reviews", reviewsRouter);
 app.use("/api/bookings", bookingsRouter);
 app.use("/api/provider", providerDashboardRouter);
 app.use("/api/internal", internalRouter);

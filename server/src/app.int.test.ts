@@ -910,7 +910,7 @@ describeDb("Slotly API", () => {
       expect(await prisma.providerVariant.count({ where: { providerId: providerBId } })).toBe(0);
     });
   });
-    describe("service variants (admin API)", () => {
+  describe("service variants (admin API)", () => {
     let svcId = "";
     let adminProviderId = "";
     let variantId = "";
@@ -1012,6 +1012,118 @@ describeDb("Slotly API", () => {
       const admin = await request(app).get("/api/admin/services").set(bearer(adminToken));
       const row = admin.body.services.find((s: { id: string }) => s.id === svcId);
       expect(row.variants.map((v: { name: string }) => v.name).sort()).toEqual(["Fade", "Kids cut"]);
+    });
+  });
+
+  describe("reviews", () => {
+    let completed1 = "";
+    let completed2 = "";
+    let notDone = "";
+    let review1Id = "";
+    let review2Id = "";
+
+    const rate = (token: string, bookingId: string, body: object) =>
+      request(app).post(`/api/bookings/${bookingId}/review`).set(bearer(token)).send(body);
+
+    beforeAll(async () => {
+      const c1 = await prisma.user.findUniqueOrThrow({ where: { email: email("customer1") } });
+      const c2 = await prisma.user.findUniqueOrThrow({ where: { email: email("customer2") } });
+      const past = (daysAgo: number) => new Date(Date.now() - daysAgo * DAY_MS);
+      const make = (customerId: string, start: Date, status: "COMPLETED" | "CONFIRMED") =>
+        prisma.booking.create({
+          data: {
+            customerId,
+            providerId,
+            serviceId,
+            startAt: start,
+            endAt: new Date(start.getTime() + 30 * 60 * 1000),
+            priceAtBooking: 100,
+            status,
+          },
+        });
+
+      completed1 = (await make(c1.id, past(30), "COMPLETED")).id;
+      completed2 = (await make(c2.id, past(29), "COMPLETED")).id;
+      notDone = (await make(c1.id, new Date(at(addDays(DATE_A, 70), "09:00")), "CONFIRMED")).id;
+    }, 60_000);
+
+    it("requires login", async () => {
+      expect((await request(app).post(`/api/bookings/${completed1}/review`).send({ rating: 5 })).status).toBe(401);
+    });
+
+    it("only allows reviewing a completed booking", async () => {
+      const res = await rate(customer1Token, notDone, { rating: 5 });
+      expect(res.status).toBe(400);
+    });
+
+    it("only lets the customer who had the booking review it", async () => {
+      expect((await rate(customer2Token, completed1, { rating: 5 })).status).toBe(404);
+      expect((await rate(customer1Token, "no-such-booking", { rating: 5 })).status).toBe(404);
+    });
+
+    it("validates the rating and comment", async () => {
+      for (const body of [{}, { rating: 0 }, { rating: 6 }, { rating: 4.5 }, { rating: "5" }, { rating: 5, comment: "x".repeat(501) }]) {
+        expect((await rate(customer1Token, completed1, body)).status).toBe(400);
+      }
+    });
+
+    it("saves a review once per booking", async () => {
+      const first = await rate(customer1Token, completed1, { rating: 5, comment: "  Great cut!  " });
+      expect(first.status).toBe(201);
+      expect(first.body.review).toMatchObject({ rating: 5, comment: "Great cut!" });
+      review1Id = first.body.review.id;
+
+      expect((await rate(customer1Token, completed1, { rating: 1 })).status).toBe(409);
+
+      const second = await rate(customer2Token, completed2, { rating: 2 });
+      expect(second.status).toBe(201);
+      review2Id = second.body.review.id;
+    });
+
+    it("shows the average and the reviews publicly without private data", async () => {
+      const res = await request(app).get(`/api/providers/${providerId}/reviews`);
+      expect(res.status).toBe(200);
+      expect(res.body.summary).toEqual({ average: 3.5, count: 2 });
+      expect(res.body.reviews).toHaveLength(2);
+      expect(res.body.reviews.map((r: { author: string }) => r.author).sort()).toEqual(["customer1", "customer2"]);
+      expect(JSON.stringify(res.body)).not.toContain("@test.slotly.dev");
+
+      expect((await request(app).get("/api/providers/no-such-provider/reviews")).status).toBe(404);
+    });
+
+    it("lists ratings for every specialist and the bookings a customer already rated", async () => {
+      const summary = await request(app).get("/api/reviews/summary");
+      expect(summary.status).toBe(200);
+      expect(summary.body.ratings).toEqual(
+        expect.arrayContaining([{ providerId, average: 3.5, count: 2 }]),
+      );
+
+      expect((await request(app).get("/api/reviews/mine")).status).toBe(401);
+      const mine = await request(app).get("/api/reviews/mine").set(bearer(customer1Token));
+      expect(mine.body.bookingIds).toEqual([completed1]);
+    });
+
+    it("lets only admins hide a review, and hidden reviews leave the average", async () => {
+      const hide = (id: string, token: string, isHidden = true) =>
+        request(app).patch(`/api/admin/reviews/${id}`).set(bearer(token)).send({ isHidden });
+
+      expect((await hide(review2Id, customer1Token)).status).toBe(403);
+      expect((await hide("no-such-review", adminToken)).status).toBe(404);
+      expect((await request(app).patch(`/api/admin/reviews/${review2Id}`).set(bearer(adminToken)).send({})).status).toBe(400);
+
+      const hidden = await hide(review2Id, adminToken);
+      expect(hidden.status).toBe(200);
+      expect(hidden.body.review).toMatchObject({ id: review2Id, isHidden: true });
+
+      const res = await request(app).get(`/api/providers/${providerId}/reviews`);
+      expect(res.body.summary).toEqual({ average: 5, count: 1 });
+      expect(res.body.reviews.map((r: { id: string }) => r.id)).toEqual([review1Id]);
+
+      const adminList = await request(app).get("/api/admin/reviews").set(bearer(adminToken));
+      expect(adminList.status).toBe(200);
+      const row = adminList.body.reviews.find((r: { id: string }) => r.id === review2Id);
+      expect(row).toMatchObject({ isHidden: true, rating: 2 });
+      expect((await request(app).get("/api/admin/reviews").set(bearer(customer1Token))).status).toBe(403);
     });
   });
 });
