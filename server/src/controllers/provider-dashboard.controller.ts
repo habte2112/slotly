@@ -159,11 +159,27 @@ const providerBookingSelect = {
   status: true,
   notes: true,
   priceAtBooking: true,
-  customer: { select: { name: true, phone: true } },
+  customer: { select: { id: true, name: true, phone: true } },
   service: { select: { name: true, durationMinutes: true } },
   variant: { select: { name: true } },
 } as const;
 
+// ለእያንዳንዱ ደንበኛ ከዚህ በፊት ስንት ጊዜ እንዳልመጣ (no-show) ይቆጥራል
+async function withNoShows<T extends { customer: { id: string } }>(bookings: T[]) {
+  const ids = [...new Set(bookings.map((b) => b.customer.id))];
+  const groups = ids.length
+    ? await prisma.booking.groupBy({
+        by: ["customerId"],
+        where: { customerId: { in: ids }, status: "NO_SHOW" },
+        _count: { _all: true },
+      })
+    : [];
+  const counts = new Map(groups.map((g) => [g.customerId, g._count._all]));
+  return bookings.map((b) => ({
+    ...b,
+    customer: { ...b.customer, noShows: counts.get(b.customer.id) ?? 0 },
+  }));
+}
 export async function listProviderBookings(req: AuthRequest, res: Response) {
   const provider = await getOwnProvider(req, res);
   if (!provider) return;
@@ -177,7 +193,7 @@ export async function listProviderBookings(req: AuthRequest, res: Response) {
     take: 100,
     select: providerBookingSelect,
   });
-  res.json({ bookings });
+  res.json({ bookings: await withNoShows(bookings) });
 }
 
 const statusSchema = z.object({ status: z.enum(["COMPLETED", "CANCELLED", "NO_SHOW"]) });
@@ -217,8 +233,9 @@ export async function updateBookingStatus(req: AuthRequest, res: Response) {
     data: { status: parsed.data.status },
     select: providerBookingSelect,
   });
-    if (parsed.data.status === "CANCELLED") notifyBooking("cancelled_by_provider", updated.id);
-  res.json({ booking: updated });
+  if (parsed.data.status === "CANCELLED") notifyBooking("cancelled_by_provider", updated.id);
+  const [withCount] = await withNoShows([updated]);
+  res.json({ booking: withCount });
 }
 
 const OFFSET_MS = 3 * 60 * 60 * 1000; // Africa/Addis_Ababa (UTC+3)
@@ -292,7 +309,8 @@ export async function createManualBooking(req: AuthRequest, res: Response) {
       },
       select: providerBookingSelect,
     });
-    res.status(201).json({ booking });
+      const [created] = await withNoShows([booking]);
+      res.status(201).json({ booking: created });
   } catch (error) {
     if (isOverlapError(error)) {
       res.status(409).json({ message: "This time slot was just taken" });

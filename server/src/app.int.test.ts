@@ -1164,6 +1164,14 @@ describeDb("Slotly API", () => {
       expect((await mark(pastId, providerToken, "BOGUS")).status).toBe(400);
     });
 
+    it("shows how many times a customer did not come in the specialist's list", async () => {
+      const res = await request(app).get("/api/provider/bookings").query({ scope: "past" }).set(bearer(providerToken));
+      expect(res.status).toBe(200);
+      const row = res.body.bookings.find((b: { id: string }) => b.id === pastId);
+      expect(row.customer.noShows).toBeGreaterThanOrEqual(1);
+      expect(row.customer).toHaveProperty("id");
+    });
+
     it("does not let a no-show customer leave a review", async () => {
       const res = await request(app)
         .post(`/api/bookings/${pastId}/review`)
@@ -1214,7 +1222,7 @@ describeDb("Slotly API", () => {
       expect(res.body.booking).toMatchObject({
         status: "CONFIRMED",
         priceAtBooking: 100,
-        customer: { name: "Walk In", phone: PHONE_INTL },
+        customer: { name: "Walk In", phone: PHONE_INTL, noShows: 0 }
       });
 
       const starts: string[] = (await availability(DATE_I)).body.slots.map((s: { start: string }) => s.start);

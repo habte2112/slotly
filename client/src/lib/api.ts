@@ -180,7 +180,7 @@ export interface ProviderBooking {
   endAt: string;
   status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED" | "NO_SHOW";
   notes: string | null;
-  customer: { name: string; phone: string | null };
+  customer: { name: string; phone: string | null; noShows: number };
   service: { name: string; durationMinutes: number };
   variant: { name: string } | null;
   priceAtBooking: number | null;

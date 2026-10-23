@@ -106,6 +106,11 @@ export default function ProviderBookings() {
               <div>
                 <p className="font-medium text-gray-900">
                   {b.variant ? `${b.service.name} · ${b.variant.name}` : b.service.name} · {b.customer.name}
+                  {b.customer.noShows > 0 && (
+                    <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-normal text-amber-800">
+                      ⚠ {b.customer.noShows} no-show{b.customer.noShows > 1 ? "s" : ""}
+                    </span>
+                  )}
                 </p>
                 <p className="text-sm text-gray-600">{formatter.format(new Date(b.startAt))}</p>
                 {b.customer.phone && <p className="text-sm text-gray-500">{b.customer.phone}</p>}
