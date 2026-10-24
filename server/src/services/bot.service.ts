@@ -4,26 +4,7 @@ import { notifyBooking } from "./email.service";
 import { callTelegram, escapeHtml, hashToken, sendTelegramMessage } from "./telegram.service";
 import { serviceLabel } from "./labels";
 import { dayBoundsUtc } from "./availability";
-
-const TZ = "Africa/Addis_Ababa";
-const whenFormat = new Intl.DateTimeFormat("en-GB", {
-  timeZone: TZ,
-  weekday: "long",
-  day: "numeric",
-  month: "long",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
-const shortFormat = new Intl.DateTimeFormat("en-GB", {
-  timeZone: TZ,
-  weekday: "short",
-  day: "numeric",
-  month: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
+import { asLocale, formatWhen, tg, type Locale } from "./telegram-messages";
 
 const chatSchema = z.object({ id: z.number(), type: z.string() });
 const updateSchema = z.object({
@@ -39,17 +20,14 @@ const updateSchema = z.object({
 });
 type Update = z.infer<typeof updateSchema>;
 
-const WELCOME =
-  "👋 Hi! I am the Slotly booking bot.\n\nTo connect this chat to your account, open Slotly → My bookings → Connect Telegram, then tap the link there.";
-const HELP =
-  "<b>Slotly bot</b>\n\n/bookings - your upcoming appointments\n/cancel - cancel an appointment\n/today - today's appointments (specialists)\n/unlink - stop notifications in this chat\n/help - show this message";
-const NOT_LINKED =
-  "This chat is not connected to a Slotly account yet.\n\nOpen Slotly → My bookings → Connect Telegram, then tap the link there.";
-const INVALID_LINK =
-  "That link is invalid or has expired. Open Slotly → My bookings → Connect Telegram to get a new one.";
-
 const userForChat = (chatId: number) =>
   prisma.user.findUnique({ where: { telegramChatId: String(chatId) }, select: { id: true, name: true } });
+
+// ያልተገናኘ ውይይት እንግሊዝኛ ያገኛል
+async function localeForChat(chatId: number): Promise<Locale> {
+  const user = await prisma.user.findUnique({ where: { telegramChatId: String(chatId) }, select: { locale: true } });
+  return asLocale(user?.locale);
+}
 
 const upcomingFor = (customerId: string) =>
   prisma.booking.findMany({
@@ -79,43 +57,44 @@ async function handleMessage(chat: { id: number; type: string }, text: string): 
   if (chat.type !== "private") return; // ቡድኖች እና channels ይታለፋሉ
   const [first = "", ...args] = text.trim().split(/\s+/);
   const command = first.split("@")[0].toLowerCase();
+  const locale = await localeForChat(chat.id);
 
   switch (command) {
     case "/start":
-      if (args[0]) await linkChat(chat.id, args[0]);
-      else await sendTelegramMessage(chat.id, WELCOME);
+      if (args[0]) await linkChat(chat.id, args[0], locale);
+      else await sendTelegramMessage(chat.id, tg(locale, "bot.welcome"));
       return;
     case "/help":
-      await sendTelegramMessage(chat.id, HELP);
+      await sendTelegramMessage(chat.id, tg(locale, "bot.help"));
       return;
     case "/bookings":
-      await showBookings(chat.id);
+      await showBookings(chat.id, locale);
       return;
-      case "/today":
-      await showToday(chat.id);
+    case "/today":
+      await showToday(chat.id, locale);
       return;
     case "/cancel":
-      await showCancelMenu(chat.id);
+      await showCancelMenu(chat.id, locale);
       return;
     case "/unlink":
-      await unlinkChat(chat.id);
+      await unlinkChat(chat.id, locale);
       return;
     default:
-      await sendTelegramMessage(chat.id, "I did not understand that. Send /help to see what I can do.");
+      await sendTelegramMessage(chat.id, tg(locale, "bot.unknown"));
   }
 }
 
-async function linkChat(chatId: number, payload: string): Promise<void> {
+async function linkChat(chatId: number, payload: string, fallback: Locale): Promise<void> {
   if (!/^[A-Za-z0-9_-]{20,64}$/.test(payload)) {
-    await sendTelegramMessage(chatId, INVALID_LINK);
+    await sendTelegramMessage(chatId, tg(fallback, "bot.invalidLink"));
     return;
   }
   const record = await prisma.telegramLinkToken.findUnique({
     where: { tokenHash: hashToken(payload) },
-    include: { user: { select: { name: true } } },
+    include: { user: { select: { name: true, locale: true } } },
   });
   if (!record || record.expiresAt <= new Date()) {
-    await sendTelegramMessage(chatId, INVALID_LINK);
+    await sendTelegramMessage(chatId, tg(fallback, "bot.invalidLink"));
     return;
   }
 
@@ -131,59 +110,62 @@ async function linkChat(chatId: number, payload: string): Promise<void> {
   });
 
   if (!linked) {
-    await sendTelegramMessage(chatId, INVALID_LINK);
+    await sendTelegramMessage(chatId, tg(fallback, "bot.invalidLink"));
     return;
   }
   await sendTelegramMessage(
     chatId,
-    `✅ <b>Connected</b>\n\nHi ${escapeHtml(record.user.name)}! You will now get your booking updates here.\n\nTry /bookings or send /help.`,
+    tg(asLocale(record.user.locale), "bot.connected", { name: escapeHtml(record.user.name) }),
   );
 }
 
-async function unlinkChat(chatId: number): Promise<void> {
+async function unlinkChat(chatId: number, locale: Locale): Promise<void> {
   const result = await prisma.user.updateMany({
     where: { telegramChatId: String(chatId) },
     data: { telegramChatId: null },
   });
-  await sendTelegramMessage(
-    chatId,
-    result.count > 0 ? "Disconnected. You will no longer get notifications in this chat." : NOT_LINKED,
-  );
+  await sendTelegramMessage(chatId, tg(locale, result.count > 0 ? "bot.disconnected" : "bot.notLinked"));
 }
 
-async function showBookings(chatId: number): Promise<void> {
+async function showBookings(chatId: number, locale: Locale): Promise<void> {
   const user = await userForChat(chatId);
   if (!user) {
-    await sendTelegramMessage(chatId, NOT_LINKED);
+    await sendTelegramMessage(chatId, tg(locale, "bot.notLinked"));
     return;
   }
   const bookings = await upcomingFor(user.id);
   if (bookings.length === 0) {
-    await sendTelegramMessage(chatId, "You have no upcoming bookings.");
+    await sendTelegramMessage(chatId, tg(locale, "bot.noUpcoming"));
     return;
   }
-    const lines = bookings.map(
-    (b) =>
-      `<b>${escapeHtml(serviceLabel(b.service.name, b.variant?.name))}</b> with ${escapeHtml(b.provider.user.name)}\n📅 ${escapeHtml(whenFormat.format(b.startAt))}`,
+  const lines = bookings.map((b) =>
+    tg(locale, "bot.bookingLine", {
+      service: escapeHtml(serviceLabel(b.service.name, b.variant?.name)),
+      provider: escapeHtml(b.provider.user.name),
+      when: escapeHtml(formatWhen(locale, "long", b.startAt)),
+    }),
   );
-  await sendTelegramMessage(chatId, `<b>Your upcoming bookings</b>\n\n${lines.join("\n\n")}\n\nSend /cancel to cancel one.`);
+  await sendTelegramMessage(chatId, tg(locale, "bot.upcomingList", { lines: lines.join("\n\n") }));
 }
 
-async function showCancelMenu(chatId: number): Promise<void> {
+async function showCancelMenu(chatId: number, locale: Locale): Promise<void> {
   const user = await userForChat(chatId);
   if (!user) {
-    await sendTelegramMessage(chatId, NOT_LINKED);
+    await sendTelegramMessage(chatId, tg(locale, "bot.notLinked"));
     return;
   }
   const bookings = await upcomingFor(user.id);
   if (bookings.length === 0) {
-    await sendTelegramMessage(chatId, "You have no upcoming bookings to cancel.");
+    await sendTelegramMessage(chatId, tg(locale, "bot.noneToCancel"));
     return;
   }
   const keyboard = bookings.map((b) => [
-    { text: `${serviceLabel(b.service.name, b.variant?.name)} · ${shortFormat.format(b.startAt)}`, callback_data: `c:${b.id}` },
+    {
+      text: `${serviceLabel(b.service.name, b.variant?.name)} · ${formatWhen(locale, "short", b.startAt)}`,
+      callback_data: `c:${b.id}`,
+    },
   ]);
-  await sendTelegramMessage(chatId, "Which booking do you want to cancel?", { inline_keyboard: keyboard });
+  await sendTelegramMessage(chatId, tg(locale, "bot.cancelWhich"), { inline_keyboard: keyboard });
 }
 
 // የዚህ ውይይት ባለቤት የሆነ ንቁ መጪ ቀጠሮ ብቻ
@@ -211,32 +193,36 @@ async function handleCallback(callback: NonNullable<Update["callback_query"]>): 
   const match = /^([cynxd]):([a-z0-9]{10,40})$/.exec(callback.data);
   if (!match) return;
   const [, action, bookingId] = match;
+  const locale = await localeForChat(chat.id);
 
   if (action === "d" || action === "x") {
-    await recordOutcome(chat.id, callback.message?.message_id, action, bookingId);
+    await recordOutcome(chat.id, callback.message?.message_id, action, bookingId, locale);
     return;
   }
 
   if (action === "n") {
-    await sendTelegramMessage(chat.id, "Okay, your booking is kept.");
+    await sendTelegramMessage(chat.id, tg(locale, "bot.kept"));
     return;
   }
 
   const booking = await bookingOfChat(chat.id, bookingId);
   if (!booking) {
-    await sendTelegramMessage(chat.id, "I could not find that booking, or it can no longer be cancelled.");
+    await sendTelegramMessage(chat.id, tg(locale, "bot.cancelUnavailable"));
     return;
   }
 
   if (action === "c") {
     await sendTelegramMessage(
       chat.id,
-      `Cancel <b>${escapeHtml(serviceLabel(booking.service.name, booking.variant?.name))}</b> on ${escapeHtml(whenFormat.format(booking.startAt))}?`,
+      tg(locale, "bot.cancelConfirm", {
+        service: escapeHtml(serviceLabel(booking.service.name, booking.variant?.name)),
+        when: escapeHtml(formatWhen(locale, "long", booking.startAt)),
+      }),
       {
         inline_keyboard: [
           [
-            { text: "Yes, cancel it", callback_data: `y:${booking.id}` },
-            { text: "Keep it", callback_data: `n:${booking.id}` },
+            { text: tg(locale, "btn.yesCancel"), callback_data: `y:${booking.id}` },
+            { text: tg(locale, "btn.keep"), callback_data: `n:${booking.id}` },
           ],
         ],
       },
@@ -249,17 +235,15 @@ async function handleCallback(callback: NonNullable<Update["callback_query"]>): 
   notifyBooking("cancelled_by_customer", booking.id); // ኢሜይል እና Telegram ማረጋገጫ ይልካል
 }
 
-const timeOnly = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false });
-
-async function showToday(chatId: number): Promise<void> {
+async function showToday(chatId: number, locale: Locale): Promise<void> {
   const user = await userForChat(chatId);
   if (!user) {
-    await sendTelegramMessage(chatId, NOT_LINKED);
+    await sendTelegramMessage(chatId, tg(locale, "bot.notLinked"));
     return;
   }
   const provider = await prisma.provider.findUnique({ where: { userId: user.id }, select: { id: true } });
   if (!provider) {
-    await sendTelegramMessage(chatId, "This command is for specialists.");
+    await sendTelegramMessage(chatId, tg(locale, "bot.specialistsOnly"));
     return;
   }
 
@@ -278,16 +262,16 @@ async function showToday(chatId: number): Promise<void> {
     },
   });
   if (rows.length === 0) {
-    await sendTelegramMessage(chatId, "No appointments today.");
+    await sendTelegramMessage(chatId, tg(locale, "bot.noToday"));
     return;
   }
   const icon = { COMPLETED: "✅", NO_SHOW: "❌" } as Record<string, string>;
   const lines = rows.map(
     (b) =>
-      `${icon[b.status] ?? "⏳"} <b>${timeOnly.format(b.startAt)}</b> ${escapeHtml(serviceLabel(b.service.name, b.variant?.name))}\n` +
+      `${icon[b.status] ?? "⏳"} <b>${formatWhen(locale, "time", b.startAt)}</b> ${escapeHtml(serviceLabel(b.service.name, b.variant?.name))}\n` +
       `    👤 ${escapeHtml(b.customer.name)}${b.customer.phone ? ` · ${escapeHtml(b.customer.phone)}` : ""}`,
   );
-  await sendTelegramMessage(chatId, `<b>Today</b>\n\n${lines.join("\n")}`);
+  await sendTelegramMessage(chatId, tg(locale, "bot.today", { lines: lines.join("\n") }));
 }
 
 // ባለሙያው "መጣ" ወይም "አልመጣም" ሲል ቀጠሮውን ይመዘግባል
@@ -296,21 +280,22 @@ async function recordOutcome(
   messageId: number | undefined,
   action: "d" | "x",
   bookingId: string,
+  locale: Locale,
 ): Promise<void> {
   const booking = await prisma.booking.findFirst({
     where: { id: bookingId, provider: { user: { telegramChatId: String(chatId) } } },
     select: { id: true, status: true, startAt: true, customerId: true, customer: { select: { name: true } } },
   });
   if (!booking) {
-    await sendTelegramMessage(chatId, "I could not find that booking.");
+    await sendTelegramMessage(chatId, tg(locale, "bot.notFound"));
     return;
   }
   if (booking.status !== "PENDING" && booking.status !== "CONFIRMED") {
-    await sendTelegramMessage(chatId, `Already recorded as ${booking.status.toLowerCase().replace("_", "-")}.`);
+    await sendTelegramMessage(chatId, tg(locale, "bot.alreadyAs", { status: tg(locale, `status.${booking.status}`) }));
     return;
   }
   if (booking.startAt > new Date()) {
-    await sendTelegramMessage(chatId, "This appointment has not started yet.");
+    await sendTelegramMessage(chatId, tg(locale, "bot.notStarted"));
     return;
   }
 
@@ -321,7 +306,7 @@ async function recordOutcome(
     data: { status },
   });
   if (claim.count === 0) {
-    await sendTelegramMessage(chatId, "Already recorded.");
+    await sendTelegramMessage(chatId, tg(locale, "bot.already"));
     return;
   }
   if (messageId) {
@@ -333,12 +318,15 @@ async function recordOutcome(
   }
 
   if (status === "COMPLETED") {
-    await sendTelegramMessage(chatId, "✅ Marked as completed.");
+    await sendTelegramMessage(chatId, tg(locale, "bot.markedCompleted"));
     return;
   }
   const count = await prisma.booking.count({ where: { customerId: booking.customerId, status: "NO_SHOW" } });
   await sendTelegramMessage(
     chatId,
-    `❌ Marked as no-show. ${escapeHtml(booking.customer.name)} now has ${count} no-show${count > 1 ? "s" : ""}.`,
+    tg(locale, count > 1 ? "bot.markedNoShowMany" : "bot.markedNoShowOne", {
+      name: escapeHtml(booking.customer.name),
+      count,
+    }),
   );
 }

@@ -4,16 +4,11 @@ import { prisma } from "../lib/prisma";
 import { googleCalendarUrl } from "./calendar";
 import type { BookingEmailKind } from "./email.service";
 import { serviceLabel } from "./labels";
+import { asLocale, formatWhen, tg, type MessageKey } from "./telegram-messages";
 
 export const telegramEnabled = Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_BOT_USERNAME);
 
 const LINK_TTL_MS = 15 * 60 * 1000;
-
-const whenFormat = new Intl.DateTimeFormat("en-GB", {
-  timeZone: "Africa/Addis_Ababa",
-  dateStyle: "full",
-  timeStyle: "short",
-});
 
 export function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -78,14 +73,6 @@ export async function createLinkUrl(userId: string): Promise<string> {
   return `https://t.me/${env.TELEGRAM_BOT_USERNAME}?start=${token}`;
 }
 
-const HEADINGS: Record<BookingEmailKind, string> = {
-  confirmed: "✅ <b>Booking confirmed</b>",
-  rescheduled: "🔄 <b>Booking rescheduled</b>",
-  cancelled_by_customer: "❌ <b>Booking cancelled</b>",
-  cancelled_by_provider: "❌ <b>Booking cancelled by the provider</b>",
-  reminder: "⏰ <b>Reminder: your appointment is coming up</b>",
-};
-
 // ፈጽሞ አይወረውርም፤ ስኬትን በ boolean ይመልሳል
 export async function sendBookingTelegram(kind: BookingEmailKind, bookingId: string): Promise<boolean> {
   try {
@@ -98,7 +85,7 @@ export async function sendBookingTelegram(kind: BookingEmailKind, bookingId: str
         startAt: true,
         endAt: true,
         priceAtBooking: true,
-        customer: { select: { telegramChatId: true } },
+        customer: { select: { telegramChatId: true, locale: true } },
         provider: { select: { user: { select: { name: true } } } },
         service: { select: { name: true, price: true } },
         variant: { select: { name: true } },
@@ -106,29 +93,33 @@ export async function sendBookingTelegram(kind: BookingEmailKind, bookingId: str
     });
     const chatId = booking?.customer.telegramChatId;
     if (!booking || !chatId) return false;
+    const locale = asLocale(booking.customer.locale);
 
-    const title = `${serviceLabel(booking.service.name, booking.variant?.name)} with ${booking.provider.user.name}`;
+    const title = tg(locale, "booking.title", {
+      service: serviceLabel(booking.service.name, booking.variant?.name),
+      provider: booking.provider.user.name,
+    });
     const price = booking.priceAtBooking ?? booking.service.price;
     const text =
-      `${HEADINGS[kind]}\n\n<b>${escapeHtml(title)}</b>\n` +
-      `📅 ${escapeHtml(whenFormat.format(booking.startAt))}\n💰 ${price} ETB`;
+      `${tg(locale, `heading.${kind}`)}\n\n<b>${escapeHtml(title)}</b>\n` +
+      `📅 ${escapeHtml(formatWhen(locale, "full", booking.startAt))}\n💰 ${tg(locale, "booking.price", { price })}`;
 
     const buttons: object[] = [];
     if (kind === "confirmed" || kind === "rescheduled" || kind === "reminder") {
       buttons.push({
-        text: "Add to Google Calendar",
+        text: tg(locale, "btn.calendar"),
         url: googleCalendarUrl({
           id: booking.id,
           startAt: booking.startAt,
           endAt: booking.endAt,
           title,
-          description: "Booked on Slotly",
+          description: tg(locale, "cal.description"),
         }),
       });
     }
     // Telegram የ localhost link ያላቸውን አዝራሮች ይከለክላል
     if (env.APP_URL.startsWith("https://")) {
-      buttons.push({ text: "My bookings", url: `${env.APP_URL}/my-bookings` });
+      buttons.push({ text: tg(locale, "btn.myBookings"), url: `${env.APP_URL}/my-bookings` });
     }
 
     return await sendTelegramMessage(chatId, text, buttons.length > 0 ? { inline_keyboard: [buttons] } : undefined);
@@ -141,24 +132,31 @@ export async function sendBookingTelegram(kind: BookingEmailKind, bookingId: str
   }
 }
 
-const PROVIDER_HEADINGS: Partial<Record<BookingEmailKind, string>> = {
-  confirmed: "🆕 <b>New booking</b>",
-  rescheduled: "🔄 <b>Booking moved</b>",
-  cancelled_by_customer: "❌ <b>The customer cancelled</b>",
-};
+function providerHeadingKey(kind: BookingEmailKind): MessageKey | null {
+  switch (kind) {
+    case "confirmed":
+      return "provider.confirmed";
+    case "rescheduled":
+      return "provider.rescheduled";
+    case "cancelled_by_customer":
+      return "provider.cancelled_by_customer";
+    default:
+      return null;
+  }
+}
 
 // ለባለሙያው፦ አዲስ ቀጠሮ፣ ማዛወር ወይም በደንበኛ መሰረዝ። ፈጽሞ አይወረውርም
 export async function sendProviderTelegram(kind: BookingEmailKind, bookingId: string): Promise<boolean> {
   try {
-    const heading = PROVIDER_HEADINGS[kind];
-    if (!telegramEnabled || !heading) return false;
+    const headingKey = providerHeadingKey(kind);
+    if (!telegramEnabled || !headingKey) return false;
 
     const b = await prisma.booking.findUnique({
       where: { id: bookingId },
       select: {
         startAt: true,
         customer: { select: { name: true, phone: true, telegramChatId: true } },
-        provider: { select: { user: { select: { telegramChatId: true } } } },
+        provider: { select: { user: { select: { telegramChatId: true, locale: true } } } },
         service: { select: { name: true } },
         variant: { select: { name: true } },
       },
@@ -166,11 +164,12 @@ export async function sendProviderTelegram(kind: BookingEmailKind, bookingId: st
     const chatId = b?.provider.user.telegramChatId;
     // ባለሙያው ለራሱ ሲይዝ ሁለት ጊዜ አይነገረውም
     if (!b || !chatId || chatId === b.customer.telegramChatId) return false;
+    const locale = asLocale(b.provider.user.locale);
 
     const text =
-      `${heading}\n\n<b>${escapeHtml(serviceLabel(b.service.name, b.variant?.name))}</b>\n` +
+      `${tg(locale, headingKey)}\n\n<b>${escapeHtml(serviceLabel(b.service.name, b.variant?.name))}</b>\n` +
       `👤 ${escapeHtml(b.customer.name)}${b.customer.phone ? ` · ${escapeHtml(b.customer.phone)}` : ""}\n` +
-      `📅 ${escapeHtml(whenFormat.format(b.startAt))}`;
+      `📅 ${escapeHtml(formatWhen(locale, "full", b.startAt))}`;
     return await sendTelegramMessage(chatId, text);
   } catch (err) {
     console.error(
@@ -198,7 +197,7 @@ export async function processOutcomePrompts(now = new Date()) {
     select: {
       id: true,
       startAt: true,
-      provider: { select: { user: { select: { telegramChatId: true } } } },
+      provider: { select: { user: { select: { telegramChatId: true, locale: true } } } },
       customer: { select: { name: true, phone: true } },
       service: { select: { name: true } },
       variant: { select: { name: true } },
@@ -216,15 +215,16 @@ export async function processOutcomePrompts(now = new Date()) {
     });
     if (claim.count === 0) continue;
 
+    const locale = asLocale(b.provider.user.locale);
     const text =
-      `🕑 <b>Did the customer come?</b>\n\n<b>${escapeHtml(serviceLabel(b.service.name, b.variant?.name))}</b>\n` +
+      `${tg(locale, "outcome.title")}\n\n<b>${escapeHtml(serviceLabel(b.service.name, b.variant?.name))}</b>\n` +
       `👤 ${escapeHtml(b.customer.name)}${b.customer.phone ? ` · ${escapeHtml(b.customer.phone)}` : ""}\n` +
-      `📅 ${escapeHtml(whenFormat.format(b.startAt))}`;
+      `📅 ${escapeHtml(formatWhen(locale, "full", b.startAt))}`;
     const ok = await sendTelegramMessage(chatId, text, {
       inline_keyboard: [
         [
-          { text: "✅ Came", callback_data: `d:${b.id}` },
-          { text: "❌ No-show", callback_data: `x:${b.id}` },
+          { text: tg(locale, "btn.came"), callback_data: `d:${b.id}` },
+          { text: tg(locale, "btn.noShow"), callback_data: `x:${b.id}` },
         ],
       ],
     });

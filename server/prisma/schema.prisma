@@ -32,6 +32,7 @@ model User {
   createdAt         DateTime  @default(now())
   passwordChangedAt DateTime?
   isGuest           Boolean   @default(false)
+  locale            String    @default("en")
   reviews           Review[]
 
   provider            Provider?

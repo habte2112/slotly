@@ -14,6 +14,7 @@ const registerSchema = z.object({
   name: z.string().trim().min(2).max(80),
   email: z.string().trim().toLowerCase().email(),
   phone: z.string().trim().min(7).max(20).optional(),
+  locale: z.enum(["en", "am"]).optional(),
   password: z.string().min(8).max(100),
 });
 
@@ -40,8 +41,7 @@ export async function register(req: Request, res: Response) {
     res.status(400).json({ message: "Invalid input", errors: formatIssues(parsed.error) });
     return;
   }
-  const { name, email, phone, password } = parsed.data;
-
+  const { name, email, phone, password, locale } = parsed.data;
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
     res.status(409).json({ message: "Email already registered" });
@@ -51,7 +51,7 @@ export async function register(req: Request, res: Response) {
   const passwordHash = await bcrypt.hash(password, 12);
   // ህዝባዊ ምዝገባ ሁልጊዜ CUSTOMER ብቻ ነው የሚፈጥረው (ደህንነት)
   const user = await prisma.user.create({
-    data: { name, email, phone, passwordHash, role: "CUSTOMER" },
+    data: { name, email, phone, passwordHash, role: "CUSTOMER", locale },
     select: { id: true, name: true, email: true, phone: true, role: true },
   });
 
@@ -90,6 +90,18 @@ export async function me(req: AuthRequest, res: Response) {
     return;
   }
   res.json({ user });
+}
+
+const localeSchema = z.object({ locale: z.enum(["en", "am"]) });
+
+export async function setLocale(req: AuthRequest, res: Response) {
+  const parsed = localeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: "Invalid input" });
+    return;
+  }
+  await prisma.user.update({ where: { id: req.user!.id }, data: { locale: parsed.data.locale } });
+  res.json({ locale: parsed.data.locale });
 }
 
 // ---- Password reset ----

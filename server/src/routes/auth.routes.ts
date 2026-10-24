@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { register, login, me, forgotPassword, resetPassword } from "../controllers/auth.controller";
+import { register, login, me, forgotPassword, resetPassword, setLocale } from "../controllers/auth.controller";
 import { authenticate } from "../middleware/auth";
 import { forgotPasswordLimiter, loginLimiter, registerLimiter } from "../middleware/rate-limit";
 
@@ -10,3 +10,4 @@ authRouter.post("/login", loginLimiter, login);
 authRouter.post("/forgot-password", forgotPasswordLimiter, forgotPassword);
 authRouter.post("/reset-password", resetPassword);
 authRouter.get("/me", authenticate, me);
+authRouter.patch("/locale", authenticate, setLocale);
