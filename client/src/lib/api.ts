@@ -121,6 +121,9 @@ export const register = (input: { name: string; email: string; phone?: string; p
 
 export const getMe = () => request<{ user: User }>("/auth/me").then((r) => r.user);
 
+export const saveLocale = (locale: "en" | "am") =>
+  request<{ locale: string }>("/auth/locale", { method: "PATCH", body: JSON.stringify({ locale }) });
+
 // ---- Catalog ----
 export const getServices = () => request<{ services: Service[] }>("/services").then((r) => r.services);
 

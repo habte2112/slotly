@@ -3,6 +3,7 @@ import { useAuth } from "../context/auth-context";
 import { useI18n } from "../i18n/useI18n";
 import Avatar from "./ui/Avatar";
 import LanguageSwitcher from "./LanguageSwitcher";
+import LocaleSync from "./LocaleSync";
 import Logo from "./ui/Logo";
 
 export default function Layout() {
@@ -11,6 +12,7 @@ export default function Layout() {
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
+      <LocaleSync />
       <div className="bg-amber-50 px-4 py-1.5 text-center text-xs text-amber-900">{t("layout.demoNotice")}</div>
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
         <nav className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
