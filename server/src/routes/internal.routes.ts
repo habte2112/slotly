@@ -4,6 +4,7 @@ import { z } from "zod";
 import { env } from "../config/env";
 import { processReminders } from "../services/email.service";
 import { autoCompleteFinishedBookings, cleanupExpiredTokens } from "../services/maintenance.service";
+import { processOutcomePrompts } from "../services/telegram.service";
 
 export const internalRouter = Router();
 
@@ -49,5 +50,12 @@ internalRouter.post("/send-reminders", async (req, res) => {
     console.error("[auto-complete] failed:", err instanceof Error ? err.message : "unknown");
   }
 
-    res.json({ ...result, cleaned, autoCompleted });
+  let outcomePrompts = 0;
+  try {
+    outcomePrompts = (await processOutcomePrompts()).prompted;
+  } catch (err) {
+    console.error("[outcome-prompts] failed:", err instanceof Error ? err.message : "unknown");
+  }
+
+      res.json({ ...result, cleaned, autoCompleted, outcomePrompts });
 });

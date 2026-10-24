@@ -1283,4 +1283,121 @@ describeDb("Slotly API", () => {
       expect(await statusOf(missed.id)).toBe("NO_SHOW"); // የተመዘገበ no-show አይለወጥም
     }, 60_000);
   });
+  describe("telegram for specialists", () => {
+    const chatId = 600_000_000 + Math.floor(Math.random() * 90_000_000);
+    const sent: { method: string; body: Record<string, any> }[] = [];
+    let customerId = "";
+    let promptedId = "";
+
+    const update = (text: string, fromChat = chatId) => ({
+      update_id: Math.floor(Math.random() * 1e9),
+      message: { message_id: 1, chat: { id: fromChat, type: "private" }, text },
+    });
+    const press = (data: string, fromChat = chatId) => ({
+      update_id: Math.floor(Math.random() * 1e9),
+      callback_query: { id: "cb", data, message: { message_id: 42, chat: { id: fromChat, type: "private" } } },
+    });
+    const webhook = (body: object) =>
+      request(app)
+        .post("/api/telegram/webhook")
+        .set("x-telegram-bot-api-secret-token", process.env.TELEGRAM_WEBHOOK_SECRET!)
+        .send(body);
+    const messageTo = (chat: number, includes: string) =>
+      sent.find(
+        (m) =>
+          m.method === "sendMessage" &&
+          String(m.body.chat_id) === String(chat) &&
+          String(m.body.text).toLowerCase().includes(includes.toLowerCase()),
+      );
+    const statusOf = async (id: string) =>
+      (await prisma.booking.findUniqueOrThrow({ where: { id }, select: { status: true } })).status;
+
+    beforeAll(async () => {
+      vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+        const method = String(input).split("/").pop() ?? "";
+        sent.push({ method, body: JSON.parse(String(init?.body ?? "{}")) });
+        return new Response(JSON.stringify({ ok: true, result: {} }), { status: 200 });
+      });
+
+      const providerUser = await prisma.user.findUniqueOrThrow({ where: { email: email("provider") } });
+      await prisma.user.update({ where: { id: providerUser.id }, data: { telegramChatId: String(chatId) } });
+      const customer = await prisma.user.findUniqueOrThrow({ where: { email: email("customer2") } });
+      customerId = customer.id;
+
+      const today = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const todayStart = new Date(`${today}T00:05:00+03:00`);
+      const make = (start: Date, status: "COMPLETED" | "CONFIRMED") =>
+        prisma.booking.create({
+          data: {
+            customerId,
+            providerId,
+            serviceId,
+            startAt: start,
+            endAt: new Date(start.getTime() + 30 * 60 * 1000),
+            priceAtBooking: 100,
+            status,
+          },
+        });
+      await make(todayStart, "COMPLETED"); // ገደብ የለውም፣ ለ /today ብቻ
+      promptedId = (await make(new Date(Date.now() - 60 * 60 * 1000), "CONFIRMED")).id; // ከ 30 ደቂቃ በፊት አልቋል
+    }, 60_000);
+
+    afterAll(async () => {
+      await prisma.user.updateMany({ where: { telegramChatId: String(chatId) }, data: { telegramChatId: null } });
+      vi.restoreAllMocks();
+    });
+
+    it("tells the specialist about a new booking", async () => {
+      const res = await book(customer2Token, at(addDays(DATE_A, 63), "10:00"));
+      expect(res.status).toBe(201);
+      await vi.waitFor(() => expect(messageTo(chatId, "New booking")).toBeTruthy(), { timeout: 10000, interval: 250 });
+      expect(String(messageTo(chatId, "New booking")!.body.text)).toContain("customer2");
+    });
+
+    it("lists today's appointments with /today, for specialists only", async () => {
+      expect((await webhook(update("/today"))).status).toBe(200);
+      await vi.waitFor(() => expect(messageTo(chatId, "Today")).toBeTruthy(), { timeout: 10000, interval: 250 });
+      expect(String(messageTo(chatId, "Today")!.body.text)).toContain("customer2");
+    });
+
+    it("asks whether the customer came and records the answer once", async () => {
+      const cron = await request(app).post("/api/internal/send-reminders").set(bearer(process.env.CRON_SECRET!));
+      expect(cron.status).toBe(200);
+      expect(cron.body.outcomePrompts).toBeGreaterThanOrEqual(1);
+
+      await vi.waitFor(
+        () => {
+          const ask = sent.find(
+            (m) =>
+              m.method === "sendMessage" &&
+              String(m.body.chat_id) === String(chatId) &&
+              JSON.stringify(m.body.reply_markup ?? {}).includes(`x:${promptedId}`),
+          );
+          expect(ask).toBeTruthy();
+          expect(JSON.stringify(ask!.body.reply_markup)).toContain(`d:${promptedId}`);
+        },
+        { timeout: 10000, interval: 250 },
+      );
+
+      // ሌላ ውይይት መመዝገብ አይችልም
+      await webhook(press(`x:${promptedId}`, chatId + 1));
+      await new Promise((r) => setTimeout(r, 500));
+      expect(await statusOf(promptedId)).toBe("CONFIRMED");
+
+      await webhook(press(`x:${promptedId}`));
+      await vi.waitFor(async () => expect(await statusOf(promptedId)).toBe("NO_SHOW"), { timeout: 10000, interval: 250 });
+      await vi.waitFor(() => expect(messageTo(chatId, "no-show")).toBeTruthy(), { timeout: 10000, interval: 250 });
+
+      // ሁለተኛ ጭነት ምንም አይቀይርም
+      await webhook(press(`d:${promptedId}`));
+      await new Promise((r) => setTimeout(r, 500));
+      expect(await statusOf(promptedId)).toBe("NO_SHOW");
+
+      // ተመሳሳይ ጥያቄ ሁለተኛ ጊዜ አይላክም
+      const again = await request(app).post("/api/internal/send-reminders").set(bearer(process.env.CRON_SECRET!));
+      expect(again.status).toBe(200);
+      const asks = sent.filter((m) => JSON.stringify(m.body.reply_markup ?? {}).includes(`x:${promptedId}`));
+      expect(asks).toHaveLength(1);
+    }, 60_000);
+  });
 });

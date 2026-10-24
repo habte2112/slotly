@@ -101,19 +101,20 @@ model TimeOff {
 }
 
 model Booking {
-  id             String        @id @default(cuid())
-  customerId     String
-  providerId     String
-  serviceId      String
-  startAt        DateTime // UTC
-  endAt          DateTime // UTC
-  status         BookingStatus @default(CONFIRMED)
-  notes          String?
-  createdAt      DateTime      @default(now())
-  reminderSentAt DateTime?
-  priceAtBooking Int?
-  variantId      String?
-  review         Review?
+  id                  String        @id @default(cuid())
+  customerId          String
+  providerId          String
+  serviceId           String
+  startAt             DateTime // UTC
+  endAt               DateTime // UTC
+  status              BookingStatus @default(CONFIRMED)
+  notes               String?
+  createdAt           DateTime      @default(now())
+  reminderSentAt      DateTime?
+  outcomePromptSentAt DateTime?
+  priceAtBooking      Int?
+  variantId           String?
+  review              Review?
 
   customer User            @relation("CustomerBookings", fields: [customerId], references: [id])
   provider Provider        @relation(fields: [providerId], references: [id])

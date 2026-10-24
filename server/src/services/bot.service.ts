@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma";
 import { notifyBooking } from "./email.service";
 import { callTelegram, escapeHtml, hashToken, sendTelegramMessage } from "./telegram.service";
 import { serviceLabel } from "./labels";
+import { dayBoundsUtc } from "./availability";
 
 const TZ = "Africa/Addis_Ababa";
 const whenFormat = new Intl.DateTimeFormat("en-GB", {
@@ -32,7 +33,7 @@ const updateSchema = z.object({
     .object({
       id: z.string(),
       data: z.string().optional(),
-      message: z.object({ chat: chatSchema }).optional(),
+      message: z.object({ chat: chatSchema, message_id: z.number().optional() }).optional(),
     })
     .optional(),
 });
@@ -41,7 +42,7 @@ type Update = z.infer<typeof updateSchema>;
 const WELCOME =
   "👋 Hi! I am the Slotly booking bot.\n\nTo connect this chat to your account, open Slotly → My bookings → Connect Telegram, then tap the link there.";
 const HELP =
-  "<b>Slotly bot</b>\n\n/bookings - your upcoming appointments\n/cancel - cancel an appointment\n/unlink - stop notifications in this chat\n/help - show this message";
+  "<b>Slotly bot</b>\n\n/bookings - your upcoming appointments\n/cancel - cancel an appointment\n/today - today's appointments (specialists)\n/unlink - stop notifications in this chat\n/help - show this message";
 const NOT_LINKED =
   "This chat is not connected to a Slotly account yet.\n\nOpen Slotly → My bookings → Connect Telegram, then tap the link there.";
 const INVALID_LINK =
@@ -89,6 +90,9 @@ async function handleMessage(chat: { id: number; type: string }, text: string): 
       return;
     case "/bookings":
       await showBookings(chat.id);
+      return;
+      case "/today":
+      await showToday(chat.id);
       return;
     case "/cancel":
       await showCancelMenu(chat.id);
@@ -204,9 +208,14 @@ async function handleCallback(callback: NonNullable<Update["callback_query"]>): 
 
   const chat = callback.message?.chat;
   if (!chat || chat.type !== "private" || !callback.data) return;
-  const match = /^([cyn]):([a-z0-9]{10,40})$/.exec(callback.data);
+  const match = /^([cynxd]):([a-z0-9]{10,40})$/.exec(callback.data);
   if (!match) return;
   const [, action, bookingId] = match;
+
+  if (action === "d" || action === "x") {
+    await recordOutcome(chat.id, callback.message?.message_id, action, bookingId);
+    return;
+  }
 
   if (action === "n") {
     await sendTelegramMessage(chat.id, "Okay, your booking is kept.");
@@ -238,4 +247,98 @@ async function handleCallback(callback: NonNullable<Update["callback_query"]>): 
   // action === "y"
   await prisma.booking.update({ where: { id: booking.id }, data: { status: "CANCELLED" } });
   notifyBooking("cancelled_by_customer", booking.id); // ኢሜይል እና Telegram ማረጋገጫ ይልካል
+}
+
+const timeOnly = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false });
+
+async function showToday(chatId: number): Promise<void> {
+  const user = await userForChat(chatId);
+  if (!user) {
+    await sendTelegramMessage(chatId, NOT_LINKED);
+    return;
+  }
+  const provider = await prisma.provider.findUnique({ where: { userId: user.id }, select: { id: true } });
+  if (!provider) {
+    await sendTelegramMessage(chatId, "This command is for specialists.");
+    return;
+  }
+
+  const today = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const { start, end } = dayBoundsUtc(today);
+  const rows = await prisma.booking.findMany({
+    where: { providerId: provider.id, status: { not: "CANCELLED" }, startAt: { gte: start, lt: end } },
+    orderBy: { startAt: "asc" },
+    take: 30,
+    select: {
+      startAt: true,
+      status: true,
+      customer: { select: { name: true, phone: true } },
+      service: { select: { name: true } },
+      variant: { select: { name: true } },
+    },
+  });
+  if (rows.length === 0) {
+    await sendTelegramMessage(chatId, "No appointments today.");
+    return;
+  }
+  const icon = { COMPLETED: "✅", NO_SHOW: "❌" } as Record<string, string>;
+  const lines = rows.map(
+    (b) =>
+      `${icon[b.status] ?? "⏳"} <b>${timeOnly.format(b.startAt)}</b> ${escapeHtml(serviceLabel(b.service.name, b.variant?.name))}\n` +
+      `    👤 ${escapeHtml(b.customer.name)}${b.customer.phone ? ` · ${escapeHtml(b.customer.phone)}` : ""}`,
+  );
+  await sendTelegramMessage(chatId, `<b>Today</b>\n\n${lines.join("\n")}`);
+}
+
+// ባለሙያው "መጣ" ወይም "አልመጣም" ሲል ቀጠሮውን ይመዘግባል
+async function recordOutcome(
+  chatId: number,
+  messageId: number | undefined,
+  action: "d" | "x",
+  bookingId: string,
+): Promise<void> {
+  const booking = await prisma.booking.findFirst({
+    where: { id: bookingId, provider: { user: { telegramChatId: String(chatId) } } },
+    select: { id: true, status: true, startAt: true, customerId: true, customer: { select: { name: true } } },
+  });
+  if (!booking) {
+    await sendTelegramMessage(chatId, "I could not find that booking.");
+    return;
+  }
+  if (booking.status !== "PENDING" && booking.status !== "CONFIRMED") {
+    await sendTelegramMessage(chatId, `Already recorded as ${booking.status.toLowerCase().replace("_", "-")}.`);
+    return;
+  }
+  if (booking.startAt > new Date()) {
+    await sendTelegramMessage(chatId, "This appointment has not started yet.");
+    return;
+  }
+
+  const status = action === "d" ? "COMPLETED" : "NO_SHOW";
+  // ሁለት ጊዜ ቢጫን አንድ ጊዜ ብቻ ይሳካል
+  const claim = await prisma.booking.updateMany({
+    where: { id: booking.id, status: { in: ["PENDING", "CONFIRMED"] } },
+    data: { status },
+  });
+  if (claim.count === 0) {
+    await sendTelegramMessage(chatId, "Already recorded.");
+    return;
+  }
+  if (messageId) {
+    await callTelegram("editMessageReplyMarkup", {
+      chat_id: chatId,
+      message_id: messageId,
+      reply_markup: { inline_keyboard: [] },
+    });
+  }
+
+  if (status === "COMPLETED") {
+    await sendTelegramMessage(chatId, "✅ Marked as completed.");
+    return;
+  }
+  const count = await prisma.booking.count({ where: { customerId: booking.customerId, status: "NO_SHOW" } });
+  await sendTelegramMessage(
+    chatId,
+    `❌ Marked as no-show. ${escapeHtml(booking.customer.name)} now has ${count} no-show${count > 1 ? "s" : ""}.`,
+  );
 }

@@ -140,3 +140,95 @@ export async function sendBookingTelegram(kind: BookingEmailKind, bookingId: str
     return false;
   }
 }
+
+const PROVIDER_HEADINGS: Partial<Record<BookingEmailKind, string>> = {
+  confirmed: "🆕 <b>New booking</b>",
+  rescheduled: "🔄 <b>Booking moved</b>",
+  cancelled_by_customer: "❌ <b>The customer cancelled</b>",
+};
+
+// ለባለሙያው፦ አዲስ ቀጠሮ፣ ማዛወር ወይም በደንበኛ መሰረዝ። ፈጽሞ አይወረውርም
+export async function sendProviderTelegram(kind: BookingEmailKind, bookingId: string): Promise<boolean> {
+  try {
+    const heading = PROVIDER_HEADINGS[kind];
+    if (!telegramEnabled || !heading) return false;
+
+    const b = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: {
+        startAt: true,
+        customer: { select: { name: true, phone: true, telegramChatId: true } },
+        provider: { select: { user: { select: { telegramChatId: true } } } },
+        service: { select: { name: true } },
+        variant: { select: { name: true } },
+      },
+    });
+    const chatId = b?.provider.user.telegramChatId;
+    // ባለሙያው ለራሱ ሲይዝ ሁለት ጊዜ አይነገረውም
+    if (!b || !chatId || chatId === b.customer.telegramChatId) return false;
+
+    const text =
+      `${heading}\n\n<b>${escapeHtml(serviceLabel(b.service.name, b.variant?.name))}</b>\n` +
+      `👤 ${escapeHtml(b.customer.name)}${b.customer.phone ? ` · ${escapeHtml(b.customer.phone)}` : ""}\n` +
+      `📅 ${escapeHtml(whenFormat.format(b.startAt))}`;
+    return await sendTelegramMessage(chatId, text);
+  } catch (err) {
+    console.error(
+      `[telegram] provider ${kind} notification crashed for booking ${bookingId}:`,
+      err instanceof Error ? err.message : "unknown",
+    );
+    return false;
+  }
+}
+
+// ቀጠሮው ካለቀ ከ 15 ደቂቃ በኋላ "ደንበኛው መጣ?" ብሎ ባለሙያውን ይጠይቃል (አንድ ጊዜ ብቻ)
+export async function processOutcomePrompts(now = new Date()) {
+  if (!telegramEnabled) return { prompted: 0 };
+
+  const due = await prisma.booking.findMany({
+    where: {
+      status: { in: ["PENDING", "CONFIRMED"] },
+      outcomePromptSentAt: null,
+      // ከ 24 ሰዓት በኋላ ቀጠሮው በራስ "completed" ይሆናል፣ ስለዚህ ያኔ አይጠየቅም
+      endAt: { lt: new Date(now.getTime() - 15 * 60 * 1000), gt: new Date(now.getTime() - 24 * 60 * 60 * 1000) },
+      provider: { user: { telegramChatId: { not: null } } },
+    },
+    orderBy: { endAt: "asc" },
+    take: 30,
+    select: {
+      id: true,
+      startAt: true,
+      provider: { select: { user: { select: { telegramChatId: true } } } },
+      customer: { select: { name: true, phone: true } },
+      service: { select: { name: true } },
+      variant: { select: { name: true } },
+    },
+  });
+
+  let prompted = 0;
+  for (const b of due) {
+    const chatId = b.provider.user.telegramChatId;
+    if (!chatId) continue;
+    // ከመላኩ በፊት "ይያዛል"፣ ስለዚህ ሁለት ጊዜ ቢሮጥ አንድ መልእክት ብቻ ይሄዳል
+    const claim = await prisma.booking.updateMany({
+      where: { id: b.id, outcomePromptSentAt: null },
+      data: { outcomePromptSentAt: now },
+    });
+    if (claim.count === 0) continue;
+
+    const text =
+      `🕑 <b>Did the customer come?</b>\n\n<b>${escapeHtml(serviceLabel(b.service.name, b.variant?.name))}</b>\n` +
+      `👤 ${escapeHtml(b.customer.name)}${b.customer.phone ? ` · ${escapeHtml(b.customer.phone)}` : ""}\n` +
+      `📅 ${escapeHtml(whenFormat.format(b.startAt))}`;
+    const ok = await sendTelegramMessage(chatId, text, {
+      inline_keyboard: [
+        [
+          { text: "✅ Came", callback_data: `d:${b.id}` },
+          { text: "❌ No-show", callback_data: `x:${b.id}` },
+        ],
+      ],
+    });
+    if (ok) prompted++;
+  }
+  return { prompted };
+}

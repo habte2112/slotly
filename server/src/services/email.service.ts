@@ -3,7 +3,7 @@ import { Resend } from "resend";
 import { env } from "../config/env";
 import { prisma } from "../lib/prisma";
 import { buildIcs, googleCalendarUrl } from "./calendar";
-import { sendBookingTelegram, telegramEnabled } from "./telegram.service";
+import { sendBookingTelegram, sendProviderTelegram, telegramEnabled } from "./telegram.service";
 import { serviceLabel } from "./labels";
 
 export type BookingEmailKind =
@@ -292,6 +292,7 @@ export async function sendBookingEmail(
 export function notifyBooking(kind: BookingEmailKind, bookingId: string): void {
   void sendBookingEmail(kind, bookingId);
   void sendBookingTelegram(kind, bookingId);
+  void sendProviderTelegram(kind, bookingId);
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
