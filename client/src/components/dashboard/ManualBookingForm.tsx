@@ -7,12 +7,14 @@ import {
   type Provider,
   type Slot,
 } from "../../lib/api";
+import { useI18n } from "../../i18n/useI18n";
 
 const todayInAddis = () => new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
 const maxDateInAddis = () =>
   new Date(Date.now() + 3 * 60 * 60 * 1000 + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
 export default function ManualBookingForm({ onCreated, onClose }: { onCreated: () => void; onClose: () => void }) {
+  const { t } = useI18n();
   const [me, setMe] = useState<Provider | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -71,7 +73,7 @@ export default function ManualBookingForm({ onCreated, onClose }: { onCreated: (
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!selected) {
-      setError("Please pick a time");
+      setError(t("mb.pickTime"));
       return;
     }
     setBusy(true);
@@ -87,7 +89,7 @@ export default function ManualBookingForm({ onCreated, onClose }: { onCreated: (
       });
       onCreated();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save the booking");
+      setError(err instanceof Error ? err.message : t("mb.errSave"));
       setSelected(null);
       setSlots(null);
       setRefreshKey((k) => k + 1);
@@ -101,15 +103,15 @@ export default function ManualBookingForm({ onCreated, onClose }: { onCreated: (
   return (
     <form onSubmit={submit} className="mt-4 rounded-xl border border-gray-200 bg-white p-4">
       <div className="flex items-center justify-between">
-        <p className="font-medium text-gray-900">Add a booking for a phone or walk-in customer</p>
+        <p className="font-medium text-gray-900">{t("mb.title")}</p>
         <button type="button" onClick={onClose} className="text-sm text-gray-500 hover:text-gray-900">
-          Close
+          {t("mb.close")}
         </button>
       </div>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <input required minLength={2} placeholder="Customer name" value={name} onChange={(e) => setName(e.target.value)} className={input} />
-        <input required placeholder="Phone (09...)" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={input} />
+        <input required minLength={2} placeholder={t("mb.namePh")} value={name} onChange={(e) => setName(e.target.value)} className={input} />
+        <input required placeholder={t("mb.phonePh")} inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={input} />
 
         <select
           required
@@ -121,7 +123,7 @@ export default function ManualBookingForm({ onCreated, onClose }: { onCreated: (
           }}
           className={input}
         >
-          <option value="">Choose a service</option>
+          <option value="">{t("mb.chooseService")}</option>
           {services.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}
@@ -139,10 +141,10 @@ export default function ManualBookingForm({ onCreated, onClose }: { onCreated: (
             }}
             className={input}
           >
-            <option value="">Choose a style</option>
+            <option value="">{t("mb.chooseStyle")}</option>
             {styles.map((v) => (
               <option key={v.id} value={v.id}>
-                {v.name} · {v.price} ETB · {v.durationMinutes} min
+                {t("mb.styleOption", { name: v.name, price: v.price, minutes: v.durationMinutes })}
               </option>
             ))}
           </select>
@@ -163,8 +165,8 @@ export default function ManualBookingForm({ onCreated, onClose }: { onCreated: (
         />
       </div>
 
-      {ready && slots === null && <p className="mt-3 text-sm text-gray-500">Loading times...</p>}
-      {slots?.length === 0 && <p className="mt-3 text-sm text-gray-600">No free times on this day.</p>}
+      {ready && slots === null && <p className="mt-3 text-sm text-gray-500">{t("mb.loadingTimes")}</p>}
+      {slots?.length === 0 && <p className="mt-3 text-sm text-gray-600">{t("mb.noTimes")}</p>}
       {slots && slots.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
           {slots.map((s) => (
@@ -185,7 +187,7 @@ export default function ManualBookingForm({ onCreated, onClose }: { onCreated: (
       )}
 
       <textarea
-        placeholder="Notes (optional)"
+        placeholder={t("mb.notesPh")}
         maxLength={500}
         rows={2}
         value={notes}
@@ -200,7 +202,7 @@ export default function ManualBookingForm({ onCreated, onClose }: { onCreated: (
         disabled={busy || !selected}
         className="mt-3 rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50"
       >
-        {busy ? "Saving..." : "Save booking"}
+        {busy ? t("mb.saving") : t("mb.save")}
       </button>
     </form>
   );

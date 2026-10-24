@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { addTimeOff, deleteTimeOff, getProviderMe, type TimeOff } from "../../lib/api";
+import { useI18n } from "../../i18n/useI18n";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Addis_Ababa", dateStyle: "medium" });
 
@@ -7,13 +8,14 @@ function todayInAddis(): string {
   return new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
-function describe(t: TimeOff): string {
-  const first = dateFmt.format(new Date(t.startAt));
-  const last = dateFmt.format(new Date(new Date(t.endAt).getTime() - 60 * 1000));
+function describe(entry: TimeOff): string {
+  const first = dateFmt.format(new Date(entry.startAt));
+  const last = dateFmt.format(new Date(new Date(entry.endAt).getTime() - 60 * 1000));
   return first === last ? first : `${first} → ${last}`;
 }
 
 export default function TimeOffManager() {
+  const { t } = useI18n();
   const [items, setItems] = useState<TimeOff[] | null>(null);
   const [startDate, setStartDate] = useState(todayInAddis);
   const [endDate, setEndDate] = useState(todayInAddis);
@@ -31,7 +33,7 @@ export default function TimeOffManager() {
     e.preventDefault();
     setError("");
     if (endDate < startDate) {
-      setError("Last day must be on or after the first day");
+      setError(t("to.errRange"));
       return;
     }
     setSubmitting(true);
@@ -45,7 +47,7 @@ export default function TimeOffManager() {
       );
       setReason("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not add time off");
+      setError(err instanceof Error ? err.message : t("to.errAdd"));
     } finally {
       setSubmitting(false);
     }
@@ -55,19 +57,19 @@ export default function TimeOffManager() {
     setError("");
     try {
       await deleteTimeOff(id);
-      setItems((list) => list?.filter((t) => t.id !== id) ?? null);
+      setItems((list) => list?.filter((entry) => entry.id !== id) ?? null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not delete");
+      setError(err instanceof Error ? err.message : t("to.errDelete"));
     }
   }
 
   return (
     <div>
       <form onSubmit={onSubmit} className="rounded-xl border border-gray-200 bg-white p-4">
-        <p className="font-medium text-gray-900">Add time off</p>
+        <p className="font-medium text-gray-900">{t("to.add")}</p>
         <div className="mt-3 flex flex-wrap items-end gap-3">
           <label className="text-sm text-gray-600">
-            From
+            {t("to.from")}
             <input
               type="date"
               required
@@ -78,7 +80,7 @@ export default function TimeOffManager() {
             />
           </label>
           <label className="text-sm text-gray-600">
-            To (inclusive)
+            {t("to.toInclusive")}
             <input
               type="date"
               required
@@ -89,7 +91,7 @@ export default function TimeOffManager() {
             />
           </label>
           <input
-            placeholder="Reason (optional)"
+            placeholder={t("to.reasonPh")}
             maxLength={200}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
@@ -100,24 +102,24 @@ export default function TimeOffManager() {
             disabled={submitting}
             className="rounded-lg bg-brand-700 px-4 py-2 text-white hover:bg-brand-800 disabled:opacity-50"
           >
-            {submitting ? "Adding..." : "Add"}
+            {submitting ? t("to.adding") : t("to.addBtn")}
           </button>
         </div>
       </form>
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
-      {!items && !error && <p className="mt-4 text-gray-500">Loading...</p>}
-      {items?.length === 0 && <p className="mt-4 text-gray-600">No upcoming time off.</p>}
+      {!items && !error && <p className="mt-4 text-gray-500">{t("common.loading")}</p>}
+      {items?.length === 0 && <p className="mt-4 text-gray-600">{t("to.none")}</p>}
 
       <ul className="mt-4 space-y-2">
-        {items?.map((t) => (
-          <li key={t.id} className="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-3">
+        {items?.map((entry) => (
+          <li key={entry.id} className="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-3">
             <div>
-              <p className="text-gray-900">{describe(t)}</p>
-              {t.reason && <p className="text-sm text-gray-500">{t.reason}</p>}
+              <p className="text-gray-900">{describe(entry)}</p>
+              {entry.reason && <p className="text-sm text-gray-500">{entry.reason}</p>}
             </div>
-            <button onClick={() => onDelete(t.id)} className="text-sm text-red-600 hover:underline">
-              Remove
+            <button onClick={() => onDelete(entry.id)} className="text-sm text-red-600 hover:underline">
+              {t("common.remove")}
             </button>
           </li>
         ))}

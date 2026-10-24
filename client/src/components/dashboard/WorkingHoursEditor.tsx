@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react";
 import { getProviderMe, saveWorkingHours, type WorkingWindow } from "../../lib/api";
+import { useI18n } from "../../i18n/useI18n";
 
 const DAYS = [
-  { value: 1, label: "Monday" },
-  { value: 2, label: "Tuesday" },
-  { value: 3, label: "Wednesday" },
-  { value: 4, label: "Thursday" },
-  { value: 5, label: "Friday" },
-  { value: 6, label: "Saturday" },
-  { value: 0, label: "Sunday" },
-];
+  { value: 1, labelKey: "day.1" },
+  { value: 2, labelKey: "day.2" },
+  { value: 3, labelKey: "day.3" },
+  { value: 4, labelKey: "day.4" },
+  { value: 5, labelKey: "day.5" },
+  { value: 6, labelKey: "day.6" },
+  { value: 0, labelKey: "day.0" },
+] as const;
 
 export default function WorkingHoursEditor() {
+  const { t } = useI18n();
   const [windows, setWindows] = useState<WorkingWindow[] | null>(null);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -46,20 +48,19 @@ export default function WorkingHoursEditor() {
       await saveWorkingHours(windows);
       setSaved(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save");
+      setError(err instanceof Error ? err.message : t("wh.errSave"));
     } finally {
       setSaving(false);
     }
   }
 
-  if (!windows) return error ? <p className="text-red-600">{error}</p> : <p className="text-gray-500">Loading...</p>;
+  if (!windows) {
+    return error ? <p className="text-red-600">{error}</p> : <p className="text-gray-500">{t("common.loading")}</p>;
+  }
 
   return (
     <div>
-      <p className="text-sm text-gray-600">
-        Add more than one time range per day for a break (for example 08:00-12:00 and 13:00-17:00). Existing bookings
-        are not affected.
-      </p>
+      <p className="text-sm text-gray-600">{t("wh.help")}</p>
 
       <div className="mt-4 space-y-3">
         {DAYS.map((d) => {
@@ -67,12 +68,12 @@ export default function WorkingHoursEditor() {
           return (
             <div key={d.value} className="rounded-xl border border-gray-200 bg-white p-4">
               <div className="flex items-center justify-between">
-                <p className="font-medium text-gray-900">{d.label}</p>
+                <p className="font-medium text-gray-900">{t(d.labelKey)}</p>
                 <button onClick={() => add(d.value)} className="text-sm text-gray-700 underline">
-                  + Add hours
+                  {t("wh.addHours")}
                 </button>
               </div>
-              {rows.length === 0 && <p className="mt-2 text-sm text-gray-500">Day off</p>}
+              {rows.length === 0 && <p className="mt-2 text-sm text-gray-500">{t("wh.dayOff")}</p>}
               {rows.map(({ w, i }) => (
                 <div key={i} className="mt-2 flex items-center gap-2">
                   <input
@@ -81,7 +82,7 @@ export default function WorkingHoursEditor() {
                     onChange={(e) => update(i, { startTime: e.target.value })}
                     className="rounded-lg border border-gray-300 p-1"
                   />
-                  <span className="text-gray-500">to</span>
+                  <span className="text-gray-500">{t("wh.to")}</span>
                   <input
                     type="time"
                     value={w.endTime}
@@ -89,7 +90,7 @@ export default function WorkingHoursEditor() {
                     className="rounded-lg border border-gray-300 p-1"
                   />
                   <button onClick={() => remove(i)} className="ml-2 text-sm text-red-600 hover:underline">
-                    Remove
+                    {t("common.remove")}
                   </button>
                 </div>
               ))}
@@ -105,9 +106,9 @@ export default function WorkingHoursEditor() {
           disabled={saving}
           className="rounded-lg bg-brand-700 px-4 py-2 text-white hover:bg-brand-800 disabled:opacity-50"
         >
-          {saving ? "Saving..." : "Save working hours"}
+          {saving ? t("wh.saving") : t("wh.save")}
         </button>
-        {saved && <span className="text-sm text-green-700">Saved</span>}
+        {saved && <span className="text-sm text-green-700">{t("wh.saved")}</span>}
       </div>
     </div>
   );

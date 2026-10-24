@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getProviderBookings, updateProviderBookingStatus, type ProviderBooking } from "../../lib/api";
+import { useI18n } from "../../i18n/useI18n";
 import ManualBookingForm from "./ManualBookingForm";
 
 const formatter = new Intl.DateTimeFormat("en-GB", {
@@ -17,6 +18,7 @@ const statusStyle: Record<ProviderBooking["status"], string> = {
 };
 
 export default function ProviderBookings() {
+  const { t } = useI18n();
   const [scope, setScope] = useState<"upcoming" | "past">("upcoming");
   const [bookings, setBookings] = useState<ProviderBooking[] | null>(null);
   const [error, setError] = useState("");
@@ -53,15 +55,15 @@ export default function ProviderBookings() {
   }
 
   async function onStatus(id: string, status: "COMPLETED" | "CANCELLED" | "NO_SHOW") {
-    if (status === "CANCELLED" && !window.confirm("Cancel this booking?")) return;
-    if (status === "NO_SHOW" && !window.confirm("Mark this customer as a no-show?")) return;
+    if (status === "CANCELLED" && !window.confirm(t("pb.confirmCancel"))) return;
+    if (status === "NO_SHOW" && !window.confirm(t("pb.confirmNoShow"))) return;
     setBusyId(id);
     setError("");
     try {
       const updated = await updateProviderBookingStatus(id, status);
       setBookings((list) => list?.map((b) => (b.id === id ? updated : b)) ?? null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update booking");
+      setError(err instanceof Error ? err.message : t("pb.errUpdate"));
     } finally {
       setBusyId("");
     }
@@ -75,11 +77,11 @@ export default function ProviderBookings() {
             <button
               key={s}
               onClick={() => changeScope(s)}
-              className={`rounded-lg border px-3 py-1 text-sm capitalize ${
+              className={`rounded-lg border px-3 py-1 text-sm ${
                 scope === s ? "border-brand-700 bg-brand-700 text-white" : "border-gray-300 bg-white hover:bg-gray-100"
               }`}
             >
-              {s}
+              {s === "upcoming" ? t("pb.upcoming") : t("pb.past")}
             </button>
           ))}
         </div>
@@ -87,15 +89,17 @@ export default function ProviderBookings() {
           onClick={() => setShowForm((v) => !v)}
           className="rounded-lg bg-brand-700 px-3 py-1 text-sm font-medium text-white hover:bg-brand-800"
         >
-          + Add booking
+          {t("pb.add")}
         </button>
       </div>
 
       {showForm && <ManualBookingForm onCreated={onCreated} onClose={() => setShowForm(false)} />}
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
-      {!bookings && !error && <p className="mt-4 text-gray-500">Loading...</p>}
-      {bookings?.length === 0 && <p className="mt-4 text-gray-600">No {scope} bookings.</p>}
+      {!bookings && !error && <p className="mt-4 text-gray-500">{t("common.loading")}</p>}
+      {bookings?.length === 0 && (
+        <p className="mt-4 text-gray-600">{scope === "upcoming" ? t("pb.noneUpcoming") : t("pb.nonePast")}</p>
+      )}
 
       <ul className="mt-4 space-y-3">
         {bookings?.map((b) => {
@@ -108,7 +112,7 @@ export default function ProviderBookings() {
                   {b.variant ? `${b.service.name} · ${b.variant.name}` : b.service.name} · {b.customer.name}
                   {b.customer.noShows > 0 && (
                     <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-normal text-amber-800">
-                      ⚠ {b.customer.noShows} no-show{b.customer.noShows > 1 ? "s" : ""}
+                      {t(b.customer.noShows > 1 ? "pb.noShowMany" : "pb.noShowOne", { count: b.customer.noShows })}
                     </span>
                   )}
                 </p>
@@ -116,7 +120,7 @@ export default function ProviderBookings() {
                 {b.customer.phone && <p className="text-sm text-gray-500">{b.customer.phone}</p>}
                 {b.notes && <p className="mt-1 text-sm italic text-gray-500">“{b.notes}”</p>}
                 <span className={`mt-2 inline-block rounded-full px-2 py-0.5 text-xs ${statusStyle[b.status]}`}>
-                  {b.status === "NO_SHOW" ? "no-show" : b.status.toLowerCase()}
+                  {t(`status.${b.status}`)}
                 </span>
               </div>
               {active && (
@@ -128,14 +132,14 @@ export default function ProviderBookings() {
                         disabled={busyId === b.id}
                         className="rounded-lg border border-gray-300 px-3 py-1 text-sm hover:bg-gray-100 disabled:opacity-50"
                       >
-                        Mark completed
+                        {t("pb.markCompleted")}
                       </button>
                       <button
                         onClick={() => onStatus(b.id, "NO_SHOW")}
                         disabled={busyId === b.id}
                         className="rounded-lg border border-red-300 px-3 py-1 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
                       >
-                        No-show
+                        {t("pb.noShowBtn")}
                       </button>
                     </>
                   ) : (
@@ -144,7 +148,7 @@ export default function ProviderBookings() {
                       disabled={busyId === b.id}
                       className="rounded-lg border border-gray-300 px-3 py-1 text-sm hover:bg-gray-100 disabled:opacity-50"
                     >
-                      Cancel
+                      {t("pb.cancel")}
                     </button>
                   )}
                 </div>
