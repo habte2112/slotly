@@ -20,6 +20,9 @@ import ServiceIcon from "../components/ui/ServiceIcon";
 import Skeleton from "../components/ui/Skeleton";
 import StyleImage from "../components/ui/StyleImage";
 import { RatingBadge } from "../components/ui/Rating";
+import { intlLocale, timeWithLocal } from "../i18n/format";
+import type { Locale } from "../i18n/context";
+import { useI18n } from "../i18n/useI18n";
 
 // የአዲስ አበባ የዛሬ ቀን (UTC+3)
 function todayInAddis(): string {
@@ -30,8 +33,8 @@ function maxDateInAddis(): string {
   return new Date(Date.now() + 3 * 60 * 60 * 1000 + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
-function prettyDate(date: string): string {
-  return new Intl.DateTimeFormat("en-GB", {
+function prettyDate(date: string, locale: Locale): string {
+  return new Intl.DateTimeFormat(intlLocale(locale), {
     timeZone: "UTC",
     weekday: "long",
     day: "numeric",
@@ -41,10 +44,10 @@ function prettyDate(date: string): string {
 }
 
 const PARTS = [
-  { label: "Morning", match: (h: number) => h < 12 },
-  { label: "Afternoon", match: (h: number) => h >= 12 && h < 17 },
-  { label: "Evening", match: (h: number) => h >= 17 },
-];
+  { labelKey: "part.morning", match: (h: number) => h < 12 },
+  { labelKey: "part.afternoon", match: (h: number) => h >= 12 && h < 17 },
+  { labelKey: "part.evening", match: (h: number) => h >= 17 },
+] as const;
 
 // label ሁልጊዜ "HH:MM" የአዲስ አበባ ሰዓት ነው
 const hourOf = (slot: Slot) => parseInt(slot.label.slice(0, 2), 10);
@@ -61,6 +64,7 @@ function StepTitle({ n, children }: { n: number; children: ReactNode }) {
 }
 
 export default function BookingPage() {
+  const { t, locale } = useI18n();
   const { serviceId = "" } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -85,7 +89,7 @@ export default function BookingPage() {
   // አገልግሎቱን እና ባለሙያዎቹን ይጭናል
   useEffect(() => {
     let cancelled = false;
-        Promise.all([
+    Promise.all([
       getServices(),
       getProviders(serviceId),
       getRatingsSummary().catch((): Record<string, RatingInfo> => ({})),
@@ -180,12 +184,12 @@ export default function BookingPage() {
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         // ሌላ ሰው ቀድሞ ይዞታል፤ ዝርዝሩን አድሰን እንደገና እንዲመርጥ እናደርጋለን
-        setError("Sorry, that time was just taken. Please pick another one.");
+        setError(t("bk.taken"));
         setSelected(null);
         setSlots(null);
         setRefreshKey((k) => k + 1);
       } else {
-        setError(err instanceof Error ? err.message : "Something went wrong");
+        setError(err instanceof Error ? err.message : t("common.error"));
       }
     } finally {
       setSubmitting(false);
@@ -198,9 +202,9 @@ export default function BookingPage() {
     if (providers && !service) {
       return (
         <p className="text-slate-700">
-          Service not found.{" "}
+          {t("bk.notFound")}{" "}
           <Link to="/" className="underline">
-            Back to services
+            {t("bk.backToServices")}
           </Link>
         </p>
       );
@@ -227,7 +231,7 @@ export default function BookingPage() {
     <div className="space-y-8">
       <div>
         <Link to="/" className="text-sm text-slate-500 hover:text-slate-900">
-          ← All services
+          {t("bk.allServices")}
         </Link>
         <div className="mt-3 flex items-center gap-4">
           <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
@@ -237,7 +241,7 @@ export default function BookingPage() {
             <h1 className="text-3xl font-bold text-slate-900">{service.name}</h1>
             {!hasStyles && (
               <p className="text-slate-600">
-                {service.durationMinutes} min · {service.price} ETB
+                {t("bk.minPrice", { min: service.durationMinutes, price: service.price })}
               </p>
             )}
           </div>
@@ -246,7 +250,7 @@ export default function BookingPage() {
 
       {hasStyles && (
         <section>
-          <StepTitle n={1}>Choose a style</StepTitle>
+          <StepTitle n={1}>{t("bk.chooseStyle")}</StepTitle>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {styles.map((s) => (
               <button
@@ -263,7 +267,7 @@ export default function BookingPage() {
                   <span className="block font-medium text-slate-900">{s.name}</span>
                   {s.description && <span className="mt-0.5 block text-sm text-slate-600">{s.description}</span>}
                   <span className="mt-2 block text-sm text-slate-700">
-                    {s.durationMinutes} min · from {s.price} ETB
+                    {t("bk.styleLine", { min: s.durationMinutes, price: s.price })}
                   </span>
                 </span>
               </button>
@@ -274,11 +278,9 @@ export default function BookingPage() {
 
       {showSpecialists && (
         <section>
-          <StepTitle n={specialistStep}>Choose a specialist</StepTitle>
+          <StepTitle n={specialistStep}>{t("bk.chooseSpecialist")}</StepTitle>
           {eligible.length === 0 && (
-            <p className="mt-3 text-slate-500">
-              {hasStyles ? "No specialists offer this style yet." : "No specialists offer this service yet."}
-            </p>
+            <p className="mt-3 text-slate-500">{hasStyles ? t("bk.noSpecStyle") : t("bk.noSpecService")}</p>
           )}
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {eligible.map((p) => {
@@ -300,13 +302,16 @@ export default function BookingPage() {
                       <span className="mt-0.5 block text-sm text-slate-600">{p.bio}</span>
                       {own && (
                         <span className="mt-2 block text-sm font-medium text-brand-700">
-                          {own.price} ETB · {own.durationMinutes} min
+                          {t("bk.priceMin", { price: own.price, min: own.durationMinutes })}
                         </span>
                       )}
                     </span>
                   </button>
-                  <Link to={`/specialists/${p.id}`} className="mt-2 inline-block text-xs text-slate-500 underline hover:text-slate-900">
-                    View profile and reviews
+                  <Link
+                    to={`/specialists/${p.id}`}
+                    className="mt-2 inline-block text-xs text-slate-500 underline hover:text-slate-900"
+                  >
+                    {t("bk.viewProfile")}
                   </Link>
                 </div>
               );
@@ -317,7 +322,7 @@ export default function BookingPage() {
 
       {providerId && (
         <section>
-          <StepTitle n={dateStep}>Choose a date</StepTitle>
+          <StepTitle n={dateStep}>{t("bk.chooseDate")}</StepTitle>
           <input
             type="date"
             value={date}
@@ -331,7 +336,7 @@ export default function BookingPage() {
 
       {providerId && (
         <section>
-          <StepTitle n={timeStep}>Choose a time</StepTitle>
+          <StepTitle n={timeStep}>{t("bk.chooseTime")}</StepTitle>
 
           {slots === null && (
             <div className="mt-4 flex flex-wrap gap-2">
@@ -342,9 +347,7 @@ export default function BookingPage() {
           )}
 
           {slots?.length === 0 && (
-            <p className="mt-4 rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-600">
-              No free times on this day. Try another date.
-            </p>
+            <p className="mt-4 rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-600">{t("bk.noTimes")}</p>
           )}
 
           {slots && slots.length > 0 && (
@@ -353,8 +356,10 @@ export default function BookingPage() {
                 const inPart = slots.filter((s) => part.match(hourOf(s)));
                 if (inPart.length === 0) return null;
                 return (
-                  <div key={part.label}>
-                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">{part.label}</p>
+                  <div key={part.labelKey}>
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                      {t(part.labelKey)}
+                    </p>
                     <div className="flex flex-wrap gap-2">
                       {inPart.map((s) => (
                         <button
@@ -380,31 +385,31 @@ export default function BookingPage() {
 
       {selected && terms && (
         <section className="rounded-2xl border border-brand-200 bg-brand-50 p-5">
-          <StepTitle n={confirmStep}>Confirm</StepTitle>
+          <StepTitle n={confirmStep}>{t("bk.confirm")}</StepTitle>
           <dl className="mt-4 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
             <div>
-              <dt className="text-slate-500">Service</dt>
+              <dt className="text-slate-500">{t("bk.service")}</dt>
               <dd className="font-medium text-slate-900">{style ? `${service.name} · ${style.name}` : service.name}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">Specialist</dt>
+              <dt className="text-slate-500">{t("bk.specialist")}</dt>
               <dd className="font-medium text-slate-900">{provider?.name}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">When</dt>
+              <dt className="text-slate-500">{t("bk.when")}</dt>
               <dd className="font-medium text-slate-900">
-                {prettyDate(date)} at {selected.label}
+              {t("bk.whenValue", { date: prettyDate(date, locale), time: timeWithLocal(locale, selected.label) })}
               </dd>
             </div>
             <div>
-              <dt className="text-slate-500">Duration and price</dt>
+              <dt className="text-slate-500">{t("bk.durationPrice")}</dt>
               <dd className="font-medium text-slate-900">
-                {terms.durationMinutes} min · {terms.price} ETB
+                {t("bk.minPrice", { min: terms.durationMinutes, price: terms.price })}
               </dd>
             </div>
           </dl>
           <textarea
-            placeholder="Notes (optional)"
+            placeholder={t("bk.notesPh")}
             maxLength={500}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
@@ -416,7 +421,7 @@ export default function BookingPage() {
             disabled={submitting}
             className="mt-3 rounded-lg bg-brand-700 px-5 py-2.5 font-medium text-white hover:bg-brand-800 disabled:opacity-50"
           >
-            {submitting ? "Booking..." : user ? "Confirm booking" : "Log in to confirm"}
+            {submitting ? t("bk.booking") : user ? t("bk.confirmBooking") : t("bk.loginToConfirm")}
           </button>
         </section>
       )}

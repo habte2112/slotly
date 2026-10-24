@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getServices, type Service } from "../lib/api";
+import { useI18n } from "../i18n/useI18n";
 import ServiceIcon from "../components/ui/ServiceIcon";
 import Skeleton from "../components/ui/Skeleton";
 
 const STEPS = [
-  { title: "Choose a service", text: "Browse what is on offer and pick what you need." },
-  { title: "Pick a specialist and time", text: "See the real free times and choose the one that suits you." },
-  { title: "Get your confirmation", text: "An email arrives right away, with a link to add it to your calendar." },
-];
+  { title: "home.step1.title", text: "home.step1.text" },
+  { title: "home.step2.title", text: "home.step2.text" },
+  { title: "home.step3.title", text: "home.step3.text" },
+] as const;
 
 export default function Home() {
+  const { t } = useI18n();
   const [services, setServices] = useState<Service[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -56,54 +58,48 @@ export default function Home() {
         <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-brand-600/40" />
         <div className="pointer-events-none absolute -bottom-24 right-24 h-56 w-56 rounded-full bg-brand-900/60" />
         <div className="relative">
-          <p className="text-sm font-medium uppercase tracking-wide text-brand-200">Online booking</p>
-          <h1 className="mt-2 max-w-xl text-3xl font-bold leading-tight sm:text-5xl">
-            Book your next appointment in seconds
-          </h1>
-          <p className="mt-4 max-w-xl text-brand-100">
-            Choose a service, pick a specialist and grab a free time slot. No phone calls, no waiting.
-          </p>
+          <p className="text-sm font-medium uppercase tracking-wide text-brand-200">{t("home.badge")}</p>
+          <h1 className="mt-2 max-w-xl text-3xl font-bold leading-tight sm:text-5xl">{t("home.title")}</h1>
+          <p className="mt-4 max-w-xl text-brand-100">{t("home.subtitle")}</p>
           <div className="mt-8 flex flex-wrap gap-3">
             <a href="#services" className="rounded-lg bg-white px-5 py-3 font-medium text-brand-800 hover:bg-brand-50">
-              Browse services
+              {t("home.browse")}
             </a>
             <Link
               to="/register"
               className="rounded-lg border border-white/40 px-5 py-3 font-medium text-white hover:bg-white/10"
             >
-              Create an account
+              {t("home.create")}
             </Link>
           </div>
           <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-brand-100">
-            <li>✓ Live availability</li>
-            <li>✓ Email confirmation</li>
-            <li>✓ Add to your calendar</li>
-            <li>✓ Reschedule or cancel anytime</li>
+            <li>{t("home.feat1")}</li>
+            <li>{t("home.feat2")}</li>
+            <li>{t("home.feat3")}</li>
+            <li>{t("home.feat4")}</li>
           </ul>
         </div>
       </section>
 
       <section id="services" className="mt-12 scroll-mt-20">
-        <h2 className="text-2xl font-bold text-slate-900">Our services</h2>
-        <p className="mt-1 text-slate-600">Pick one to see who is available.</p>
+        <h2 className="text-2xl font-bold text-slate-900">{t("home.servicesTitle")}</h2>
+        <p className="mt-1 text-slate-600">{t("home.servicesSub")}</p>
 
         {loading && slow && (
-          <p className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Waking up the demo server. This can take up to a minute on the free hosting tier.
-          </p>
+          <p className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">{t("home.waking")}</p>
         )}
 
         {error && !loading && (
           <div className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}{" "}
             <button onClick={retry} className="font-medium underline">
-              Try again
+              {t("home.retry")}
             </button>
           </div>
         )}
 
         {!loading && !error && services.length === 0 && (
-          <p className="mt-6 text-slate-600">No services are available right now.</p>
+          <p className="mt-6 text-slate-600">{t("home.noServices")}</p>
         )}
 
         <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -128,22 +124,26 @@ export default function Home() {
               <h3 className="mt-4 font-semibold text-slate-900">{s.name}</h3>
               <p className="mt-1 flex-1 text-sm text-slate-600">{s.description}</p>
               {s.variants.length > 0 && (
-                <p className="mt-3 text-xs font-medium text-brand-700">{s.variants.length} styles to choose from</p>
+                <p className="mt-3 text-xs font-medium text-brand-700">
+                  {t("home.styles", { count: s.variants.length })}
+                </p>
               )}
               <div className="mt-4 flex items-center justify-between text-sm">
                 {s.variants.length > 0 ? (
                   <>
                     <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">
-                      from {Math.min(...s.variants.map((v) => v.durationMinutes))} min
+                      {t("home.fromMin", { min: Math.min(...s.variants.map((v) => v.durationMinutes)) })}
                     </span>
                     <span className="font-semibold text-slate-900">
-                      from {Math.min(...s.variants.map((v) => v.price))} ETB
+                      {t("home.fromPrice", { price: Math.min(...s.variants.map((v) => v.price)) })}
                     </span>
                   </>
                 ) : (
                   <>
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">{s.durationMinutes} min</span>
-                    <span className="font-semibold text-slate-900">{s.price} ETB</span>
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">
+                      {t("home.min", { min: s.durationMinutes })}
+                    </span>
+                    <span className="font-semibold text-slate-900">{t("home.price", { price: s.price })}</span>
                   </>
                 )}
               </div>
@@ -151,7 +151,7 @@ export default function Home() {
                 to={`/book/${s.id}`}
                 className="mt-4 rounded-lg bg-brand-700 px-3 py-2 text-center text-sm font-medium text-white hover:bg-brand-800"
               >
-                Book now
+                {t("home.book")}
               </Link>
             </li>
           ))}
@@ -159,7 +159,7 @@ export default function Home() {
       </section>
 
       <section className="mt-14">
-        <h2 className="text-2xl font-bold text-slate-900">How it works</h2>
+        <h2 className="text-2xl font-bold text-slate-900">{t("home.howTitle")}</h2>
         <ol className="mt-6 grid gap-6 sm:grid-cols-3">
           {STEPS.map((step, i) => (
             <li key={step.title} className="flex gap-4">
@@ -167,8 +167,8 @@ export default function Home() {
                 {i + 1}
               </span>
               <div>
-                <h3 className="font-semibold text-slate-900">{step.title}</h3>
-                <p className="mt-1 text-sm text-slate-600">{step.text}</p>
+                <h3 className="font-semibold text-slate-900">{t(step.title)}</h3>
+                <p className="mt-1 text-sm text-slate-600">{t(step.text)}</p>
               </div>
             </li>
           ))}

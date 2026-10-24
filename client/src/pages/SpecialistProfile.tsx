@@ -4,8 +4,11 @@ import { getProviderReviews, getProviders, type Provider, type RatingInfo, type 
 import Avatar from "../components/ui/Avatar";
 import Skeleton from "../components/ui/Skeleton";
 import { RatingBadge, Stars } from "../components/ui/Rating";
+import { intlLocale } from "../i18n/format";
+import { useI18n } from "../i18n/useI18n";
 
 export default function SpecialistProfile() {
+  const { t, locale } = useI18n();
   const { id = "" } = useParams();
   const [provider, setProvider] = useState<Provider | null | undefined>(undefined);
   const [summary, setSummary] = useState<RatingInfo>({ average: 0, count: 0 });
@@ -41,9 +44,9 @@ export default function SpecialistProfile() {
   if (provider === null) {
     return (
       <p className="text-slate-700">
-        Specialist not found.{" "}
+        {t("sp.notFound")}{" "}
         <Link to="/" className="underline">
-          Back to services
+          {t("bk.backToServices")}
         </Link>
       </p>
     );
@@ -52,7 +55,7 @@ export default function SpecialistProfile() {
   return (
     <div className="space-y-8">
       <Link to="/" className="text-sm text-slate-500 hover:text-slate-900">
-        ← All services
+        {t("bk.allServices")}
       </Link>
 
       <header className="flex items-start gap-4">
@@ -65,8 +68,8 @@ export default function SpecialistProfile() {
       </header>
 
       <section>
-        <h2 className="font-semibold text-slate-900">Services</h2>
-        {provider.services.length === 0 && <p className="mt-2 text-slate-500">No services listed yet.</p>}
+        <h2 className="font-semibold text-slate-900">{t("sp.services")}</h2>
+        {provider.services.length === 0 && <p className="mt-2 text-slate-500">{t("sp.noServices")}</p>}
         <ul className="mt-3 grid gap-3 sm:grid-cols-2">
           {provider.services.map((s) => (
             <li key={s.id} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4">
@@ -75,7 +78,7 @@ export default function SpecialistProfile() {
                 to={`/book/${s.id}`}
                 className="rounded-lg bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800"
               >
-                Book
+                {t("sp.book")}
               </Link>
             </li>
           ))}
@@ -83,23 +86,23 @@ export default function SpecialistProfile() {
         {provider.variants.length > 0 && (
           <ul className="mt-4 space-y-1 text-sm text-slate-600">
             {provider.variants.map((v) => (
-              <li key={v.id}>
-                {v.name} · {v.price} ETB · {v.durationMinutes} min
-              </li>
+              <li key={v.id}>{t("sp.variantLine", { name: v.name, price: v.price, min: v.durationMinutes })}</li>
             ))}
           </ul>
         )}
       </section>
 
       <section>
-        <h2 className="font-semibold text-slate-900">Reviews ({summary.count})</h2>
-        {reviews.length === 0 && <p className="mt-2 text-slate-500">No reviews yet.</p>}
+        <h2 className="font-semibold text-slate-900">{t("sp.reviews", { count: summary.count })}</h2>
+        {reviews.length === 0 && <p className="mt-2 text-slate-500">{t("sp.noReviews")}</p>}
         <ul className="mt-3 space-y-3">
           {reviews.map((r) => (
             <li key={r.id} className="rounded-2xl border border-slate-200 bg-white p-4">
               <div className="flex items-center justify-between">
                 <Stars value={r.rating} />
-                <span className="text-xs text-slate-500">{new Date(r.createdAt).toLocaleDateString("en-GB")}</span>
+                <span className="text-xs text-slate-500">
+                  {new Date(r.createdAt).toLocaleDateString(intlLocale(locale))}
+                </span>
               </div>
               {r.comment && <p className="mt-2 text-slate-700">{r.comment}</p>}
               <p className="mt-2 text-xs text-slate-500">{r.author}</p>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ApiError,
@@ -8,12 +8,10 @@ import {
   type Booking,
   type Slot,
 } from "../lib/api";
+import { intlLocale, timeWithLocal } from "../i18n/format";
+import { useI18n } from "../i18n/useI18n";
 
-const formatter = new Intl.DateTimeFormat("en-GB", {
-  timeZone: "Africa/Addis_Ababa",
-  dateStyle: "medium",
-  timeStyle: "short",
-});
+const TZ = "Africa/Addis_Ababa";
 
 function todayInAddis(): string {
   return new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -24,6 +22,7 @@ function maxDateInAddis(): string {
 }
 
 export default function Reschedule() {
+  const { t, locale } = useI18n();
   const { id = "" } = useParams();
   const navigate = useNavigate();
 
@@ -36,13 +35,21 @@ export default function Reschedule() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  const fmt = useMemo(() => {
+    const l = intlLocale(locale);
+    return {
+      date: new Intl.DateTimeFormat(l, { timeZone: TZ, dateStyle: "medium" }),
+      time: new Intl.DateTimeFormat(l, { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false }),
+    };
+  }, [locale]);
+
   useEffect(() => {
     let cancelled = false;
     getMyBookings()
       .then((list) => {
         if (cancelled) return;
         const found = list.find((b) => b.id === id) ?? null;
-        if (!found) setLoadError("Booking not found");
+        if (!found) setLoadError(t("rs.notFound"));
         setBooking(found);
       })
       .catch((e) => {
@@ -51,6 +58,8 @@ export default function Reschedule() {
     return () => {
       cancelled = true;
     };
+    // t ከቋንቋ ጋር ይቀየራል፤ ቀጠሮውን እንደገና መጫን አያስፈልግም
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   useEffect(() => {
@@ -87,12 +96,12 @@ export default function Reschedule() {
       navigate("/my-bookings");
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        setError("Sorry, that time is no longer available. Please pick another one.");
+        setError(t("rs.unavailable"));
         setSelected(null);
         setSlots(null);
         setRefreshKey((k) => k + 1);
       } else {
-        setError(err instanceof Error ? err.message : "Something went wrong");
+        setError(err instanceof Error ? err.message : t("common.error"));
       }
     } finally {
       setSubmitting(false);
@@ -100,37 +109,43 @@ export default function Reschedule() {
   }
 
   if (loadError) return <p className="text-red-600">{loadError}</p>;
-  if (!booking) return <p className="text-gray-500">Loading...</p>;
+  if (!booking) return <p className="text-gray-500">{t("common.loading")}</p>;
 
   const movable =
     (booking.status === "PENDING" || booking.status === "CONFIRMED") && new Date(booking.startAt) > new Date();
   if (!movable) {
     return (
       <p className="text-gray-700">
-        This booking can no longer be rescheduled.{" "}
+        {t("rs.cannot")}{" "}
         <Link to="/my-bookings" className="underline">
-          Back to my bookings
+          {t("rs.backMy")}
         </Link>
       </p>
     );
   }
 
+  const current = new Date(booking.startAt);
+  const separator = locale === "am" ? "፣ " : ", ";
+  const currentWhen = `${fmt.date.format(current)}${separator}${timeWithLocal(locale, fmt.time.format(current))}`;
+
   return (
     <div className="space-y-8">
       <div>
         <Link to="/my-bookings" className="text-sm text-gray-500 hover:text-gray-900">
-          ← My bookings
+          {t("rs.back")}
         </Link>
-        <h1 className="mt-2 text-3xl font-bold text-gray-900">Reschedule</h1>
+        <h1 className="mt-2 text-3xl font-bold text-gray-900">{t("rs.title")}</h1>
         <p className="text-gray-600">
-          {booking.variant ? `${booking.service.name} · ${booking.variant.name}` : booking.service.name} with{" "}
-          {booking.provider.user.name}
+          {t("rs.with", {
+            service: booking.variant ? `${booking.service.name} · ${booking.variant.name}` : booking.service.name,
+            provider: booking.provider.user.name,
+          })}
         </p>
-        <p className="text-sm text-gray-500">Current time: {formatter.format(new Date(booking.startAt))}</p>
+        <p className="text-sm text-gray-500">{t("rs.current", { when: currentWhen })}</p>
       </div>
 
       <section>
-        <h2 className="font-semibold text-gray-900">1. Choose a new date</h2>
+        <h2 className="font-semibold text-gray-900">{t("rs.step1")}</h2>
         <input
           type="date"
           value={date}
@@ -142,9 +157,9 @@ export default function Reschedule() {
       </section>
 
       <section>
-        <h2 className="font-semibold text-gray-900">2. Choose a new time</h2>
-        {slots === null && <p className="mt-2 text-gray-500">Loading times...</p>}
-        {slots?.length === 0 && <p className="mt-2 text-gray-500">No free times on this day. Try another date.</p>}
+        <h2 className="font-semibold text-gray-900">{t("rs.step2")}</h2>
+        {slots === null && <p className="mt-2 text-gray-500">{t("mb.loadingTimes")}</p>}
+        {slots?.length === 0 && <p className="mt-2 text-gray-500">{t("bk.noTimes")}</p>}
         <div className="mt-3 flex flex-wrap gap-2">
           {slots?.map((s) => (
             <button
@@ -168,7 +183,7 @@ export default function Reschedule() {
           disabled={submitting}
           className="rounded-lg bg-brand-700 px-4 py-2 text-white hover:bg-brand-800 disabled:opacity-50"
         >
-          {submitting ? "Saving..." : `Move to ${date} at ${selected.label}`}
+          {submitting ? t("my.saving") : t("rs.move", { date, time: timeWithLocal(locale, selected.label) })}
         </button>
       )}
 

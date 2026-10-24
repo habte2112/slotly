@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   cancelBooking,
@@ -9,12 +9,23 @@ import {
 } from "../lib/api";
 import Skeleton from "../components/ui/Skeleton";
 import TelegramCard from "../components/TelegramCard";
+import { intlLocale, timeWithLocal } from "../i18n/format";
+import { useI18n } from "../i18n/useI18n";
 
 const TZ = "Africa/Addis_Ababa";
-const dayFmt = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, day: "numeric" });
-const monthFmt = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, month: "short" });
-const weekdayFmt = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, weekday: "long" });
-const timeFmt = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false });
+
+function useFormatters() {
+  const { locale } = useI18n();
+  return useMemo(() => {
+    const l = intlLocale(locale);
+    return {
+      day: new Intl.DateTimeFormat(l, { timeZone: TZ, day: "numeric" }),
+      month: new Intl.DateTimeFormat(l, { timeZone: TZ, month: "short" }),
+      weekday: new Intl.DateTimeFormat(l, { timeZone: TZ, weekday: "long" }),
+      time: new Intl.DateTimeFormat(l, { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false }),
+    };
+  }, [locale]);
+}
 
 const statusStyle: Record<Booking["status"], string> = {
   PENDING: "bg-yellow-100 text-yellow-800",
@@ -33,13 +44,14 @@ function ReviewForm({
   onDone: (id: string) => void;
   onError: (message: string) => void;
 }) {
+  const { t } = useI18n();
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function submit() {
     if (!rating) {
-      onError("Please pick a star rating");
+      onError(t("my.pickStar"));
       return;
     }
     setBusy(true);
@@ -48,7 +60,7 @@ function ReviewForm({
       await createReview(bookingId, rating, comment.trim() || undefined);
       onDone(bookingId);
     } catch (err) {
-      onError(err instanceof Error ? err.message : "Could not save your review");
+      onError(err instanceof Error ? err.message : t("my.errReview"));
     } finally {
       setBusy(false);
     }
@@ -56,13 +68,13 @@ function ReviewForm({
 
   return (
     <div className="mt-1 w-full rounded-xl bg-slate-50 p-3">
-      <div className="flex gap-1" role="radiogroup" aria-label="Rating">
+      <div className="flex gap-1" role="radiogroup" aria-label={t("my.rating")}>
         {[1, 2, 3, 4, 5].map((n) => (
           <button
             key={n}
             type="button"
             onClick={() => setRating(n)}
-            aria-label={`${n} star${n > 1 ? "s" : ""}`}
+            aria-label={t(n > 1 ? "my.starMany" : "my.starOne", { count: n })}
             className={`text-2xl leading-none ${n <= rating ? "text-amber-500" : "text-slate-300"}`}
           >
             ★
@@ -70,7 +82,7 @@ function ReviewForm({
         ))}
       </div>
       <textarea
-        placeholder="How was your visit? (optional)"
+        placeholder={t("my.reviewPh")}
         maxLength={500}
         rows={2}
         value={comment}
@@ -82,7 +94,7 @@ function ReviewForm({
         disabled={busy}
         className="mt-2 rounded-lg bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50"
       >
-        {busy ? "Saving..." : "Submit review"}
+        {busy ? t("my.saving") : t("my.submitReview")}
       </button>
     </div>
   );
@@ -103,6 +115,8 @@ function BookingRow({
   onReviewed: (id: string) => void;
   onError: (message: string) => void;
 }) {
+  const { t, locale } = useI18n();
+  const fmt = useFormatters();
   const [showForm, setShowForm] = useState(false);
   const start = new Date(b.startAt);
   const end = new Date(b.endAt);
@@ -113,8 +127,8 @@ function BookingRow({
   return (
     <li className="flex flex-wrap items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-brand-50 text-brand-800">
-        <span className="text-lg font-bold leading-none">{dayFmt.format(start)}</span>
-        <span className="text-xs uppercase">{monthFmt.format(start)}</span>
+        <span className="text-lg font-bold leading-none">{fmt.day.format(start)}</span>
+        <span className="text-xs uppercase">{fmt.month.format(start)}</span>
       </div>
 
       <div className="min-w-0 flex-1">
@@ -122,20 +136,25 @@ function BookingRow({
           {b.variant ? `${b.service.name} · ${b.variant.name}` : b.service.name}
         </p>
         <p className="text-sm text-slate-600">
-          with{" "}
+          {t("my.withBefore")}
           <Link to={`/specialists/${b.provider.id}`} className="underline hover:text-slate-900">
             {b.provider.user.name}
           </Link>
+          {t("my.withAfter")}
         </p>
         <p className="text-sm text-slate-500">
-          {weekdayFmt.format(start)}, {timeFmt.format(start)} – {timeFmt.format(end)} ·{" "}
-          {b.priceAtBooking ?? b.service.price} ETB
+          {t("my.when", {
+            weekday: fmt.weekday.format(start),
+            start: timeWithLocal(locale, fmt.time.format(start)),
+            end: fmt.time.format(end),
+            price: b.priceAtBooking ?? b.service.price,
+          })}
         </p>
         <span className={`mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${statusStyle[b.status]}`}>
-          {b.status.toLowerCase()}
+          {t(`status.${b.status}`)}
         </span>
         {b.status === "COMPLETED" && reviewed && (
-          <span className="ml-2 text-xs text-slate-500">★ Thanks for your review</span>
+          <span className="ml-2 text-xs text-slate-500">{t("my.thanks")}</span>
         )}
       </div>
 
@@ -145,14 +164,14 @@ function BookingRow({
             to={`/reschedule/${b.id}`}
             className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
           >
-            Reschedule
+            {t("my.reschedule")}
           </Link>
           <button
             onClick={() => onCancel(b.id)}
             disabled={busy}
             className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100 disabled:opacity-50"
           >
-            {busy ? "Cancelling..." : "Cancel"}
+            {busy ? t("my.cancelling") : t("my.cancel")}
           </button>
         </div>
       )}
@@ -162,7 +181,7 @@ function BookingRow({
           onClick={() => setShowForm(true)}
           className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm text-amber-800 hover:bg-amber-100"
         >
-          ★ Rate
+          {t("my.rate")}
         </button>
       )}
 
@@ -172,6 +191,7 @@ function BookingRow({
 }
 
 export default function MyBookings() {
+  const { t } = useI18n();
   const [bookings, setBookings] = useState<Booking[] | null>(null);
   const [reviewed, setReviewed] = useState<string[]>([]);
   const [error, setError] = useState("");
@@ -187,14 +207,14 @@ export default function MyBookings() {
   }, []);
 
   async function onCancel(id: string) {
-    if (!window.confirm("Cancel this booking?")) return;
+    if (!window.confirm(t("my.confirmCancel"))) return;
     setBusyId(id);
     setError("");
     try {
       const updated = await cancelBooking(id);
       setBookings((list) => list?.map((b) => (b.id === id ? updated : b)) ?? null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not cancel");
+      setError(err instanceof Error ? err.message : t("my.errCancel"));
     } finally {
       setBusyId("");
     }
@@ -219,7 +239,7 @@ export default function MyBookings() {
 
   return (
     <>
-      <h1 className="text-3xl font-bold text-slate-900">My bookings</h1>
+      <h1 className="text-3xl font-bold text-slate-900">{t("my.title")}</h1>
       <TelegramCard />
 
       {error && <p className="mt-4 text-red-600">{error}</p>}
@@ -233,27 +253,27 @@ export default function MyBookings() {
 
       {bookings?.length === 0 && (
         <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
-          <p className="font-medium text-slate-900">You have no bookings yet</p>
-          <p className="mt-1 text-sm text-slate-600">Pick a service and book your first appointment.</p>
+          <p className="font-medium text-slate-900">{t("my.none")}</p>
+          <p className="mt-1 text-sm text-slate-600">{t("my.noneSub")}</p>
           <Link
             to="/"
             className="mt-4 inline-block rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800"
           >
-            Browse services
+            {t("home.browse")}
           </Link>
         </div>
       )}
 
       {upcoming.length > 0 && (
         <section className="mt-6">
-          <h2 className="font-semibold text-slate-900">Upcoming</h2>
+          <h2 className="font-semibold text-slate-900">{t("my.upcoming")}</h2>
           <ul className="mt-3 space-y-3">{upcoming.map(row)}</ul>
         </section>
       )}
 
       {history.length > 0 && (
         <section className="mt-8">
-          <h2 className="font-semibold text-slate-900">Past and cancelled</h2>
+          <h2 className="font-semibold text-slate-900">{t("my.history")}</h2>
           <ul className="mt-3 space-y-3">{history.map(row)}</ul>
         </section>
       )}
