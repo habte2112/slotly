@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { am } from "./am";
 import { I18nContext, type I18n, type Locale } from "./context";
-import { en, type Messages } from "./en";
+import { setCurrentLocale } from "./errors";
+import { translate } from "./translate";
 
-const DICTS: Record<Locale, Messages> = { en, am };
 const KEY = "slotly_locale";
 
 function initialLocale(): Locale {
@@ -17,9 +16,14 @@ function initialLocale(): Locale {
 }
 
 export default function LocaleProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(initialLocale);
+  const [locale, setLocaleState] = useState<Locale>(() => {
+    const first = initialLocale();
+    setCurrentLocale(first); // የ API ስህተት ተርጓሚው ከመጀመሪያው ጥያቄ በፊት ቋንቋውን ያውቃል
+    return first;
+  });
 
   const setLocale = useCallback((next: Locale) => {
+    setCurrentLocale(next);
     setLocaleState(next);
     try {
       localStorage.setItem(KEY, next);
@@ -32,14 +36,7 @@ export default function LocaleProvider({ children }: { children: ReactNode }) {
     document.documentElement.lang = locale;
   }, [locale]);
 
-  const t = useCallback<I18n["t"]>(
-    (key, params) => {
-      let text: string = DICTS[locale][key] ?? en[key] ?? key;
-      if (params) for (const [k, v] of Object.entries(params)) text = text.replaceAll(`{${k}}`, String(v));
-      return text;
-    },
-    [locale],
-  );
+  const t = useCallback<I18n["t"]>((key, params) => translate(locale, key, params), [locale]);
 
   const value = useMemo(() => ({ locale, setLocale, t }), [locale, setLocale, t]);
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;

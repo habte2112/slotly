@@ -81,7 +81,7 @@ export default function ResetPassword() {
         {error && (
           <p className="text-sm text-red-600">
             {error}{" "}
-            {error.includes("expired") && (
+            {error === t("err.resetInvalid") && (
               <Link to="/forgot-password" className="underline">
                 {t("auth.reset.requestNew")}
               </Link>

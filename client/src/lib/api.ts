@@ -1,3 +1,4 @@
+import { translateServerError } from "../i18n/errors";
 export interface ServiceSummary {
   id: string;
   name: string;
@@ -103,7 +104,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     },
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(data.message ?? "Request failed", res.status);
+  if (!res.ok) throw new ApiError(translateServerError(data.message ?? "Request failed"), res.status);
   return data as T;
 }
 
