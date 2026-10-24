@@ -127,8 +127,9 @@ export function tg(locale: Locale, key: MessageKey, params?: Record<string, stri
   return text.replace(/\{(\w+)\}/g, (match, name: string) => (name in params ? String(params[name]) : match));
 }
 
-const INTL_LOCALE: Record<Locale, string> = { en: "en-GB", am: "am-ET" };
+const TZ = "Africa/Addis_Ababa";
 
+// እንግሊዝኛ፦ ቅርጸቶቹ እንደበፊቱ ናቸው
 const FORMATS = {
   full: { dateStyle: "full", timeStyle: "short" },
   long: { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", hour12: false },
@@ -138,14 +139,39 @@ const FORMATS = {
 
 export type FormatName = keyof typeof FORMATS;
 
+// አማርኛ፦ ቀኑ ለብቻ፣ ሰዓቱ በ24 ሰዓት ከኢትዮጵያ ሰዓት ጋር
+const DATE_PART = {
+  full: { dateStyle: "full" },
+  long: { weekday: "long", day: "numeric", month: "long" },
+  short: { weekday: "short", day: "numeric", month: "short" },
+} as const;
+const CLOCK = { hour: "2-digit", minute: "2-digit", hourCycle: "h23" } as const;
+
 const cache = new Map<string, Intl.DateTimeFormat>();
 
-export function formatWhen(locale: Locale, name: FormatName, date: Date): string {
-  const cacheKey = `${locale}:${name}`;
-  let formatter = cache.get(cacheKey);
-  if (!formatter) {
-    formatter = new Intl.DateTimeFormat(INTL_LOCALE[locale], { timeZone: "Africa/Addis_Ababa", ...FORMATS[name] });
-    cache.set(cacheKey, formatter);
+function formatter(intlLocale: string, id: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const cacheKey = `${intlLocale}:${id}`;
+  let found = cache.get(cacheKey);
+  if (!found) {
+    found = new Intl.DateTimeFormat(intlLocale, { timeZone: TZ, ...options });
+    cache.set(cacheKey, found);
   }
-  return formatter.format(date);
+  return found;
+}
+
+// "HH:MM" (24 ሰዓት) → የኢትዮጵያ ሰዓት አቆጣጠር (የ6 ሰዓት ልዩነት)፤ 10:00 → "ጠዋት 4 ሰዓት"
+export function ethiopianTime(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  const hour = (h + 6) % 12 || 12;
+  const period = h >= 6 && h < 12 ? "ጠዋት" : h >= 12 && h < 18 ? "ቀን" : h >= 18 ? "ማታ" : "ሌሊት";
+  return `${period} ${hour}${m ? `:${String(m).padStart(2, "0")}` : ""} ሰዓት`;
+}
+
+export function formatWhen(locale: Locale, name: FormatName, date: Date): string {
+  if (locale === "en") return formatter("en-GB", name, FORMATS[name]).format(date);
+
+  const clock = formatter("am-ET", "clock", CLOCK).format(date);
+  const withLocal = `${clock} (${ethiopianTime(clock)})`;
+  if (name === "time") return withLocal;
+  return `${formatter("am-ET", name, DATE_PART[name]).format(date)}፣ ${withLocal}`;
 }
