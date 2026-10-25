@@ -265,6 +265,7 @@ export const en = {
   "err.alreadyStatus": "This booking is already recorded: {status}.",
   "err.timeOffConflict": "You have {count} booking(s) in this period. Cancel them first.",
   "err.generic": "The request failed.",
+  "layout.footerReal": "© {year} Slotly",
 } as const;
 
 export type Messages = Record<keyof typeof en, string>;

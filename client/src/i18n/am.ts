@@ -269,4 +269,5 @@ export const am: Messages = {
   "err.alreadyStatus": "ይህ ቀጠሮ አስቀድሞ ተመዝግቧል፦ {status}።",
   "err.timeOffConflict": "በዚህ ጊዜ ውስጥ {count} ቀጠሮ(ዎች) አለዎት። መጀመሪያ እነሱን ይሰርዙ።",
   "err.generic": "ጥያቄው አልተሳካም።",
+  "layout.footerReal": "© {year} Slotly",
 };
