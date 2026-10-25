@@ -8,6 +8,7 @@ import {
   type AdminProvider,
   type AdminService,
 } from "../../lib/api";
+import { useI18n } from "../../i18n/useI18n";
 
 type Row = { on: boolean; price: string; minutes: string };
 
@@ -21,6 +22,7 @@ function rowsFor(p: AdminProvider): Record<string, Row> {
 }
 
 export default function AdminProviders() {
+  const { t } = useI18n();
   const [providers, setProviders] = useState<AdminProvider[] | null>(null);
   const [services, setServices] = useState<AdminService[]>([]);
   const [selected, setSelected] = useState<Record<string, string[]>>({});
@@ -91,10 +93,10 @@ export default function AdminProviders() {
 
       await setProviderServices(providerId, serviceIds);
       await setProviderStyles(providerId, variants);
-      setNotice("Saved");
+      setNotice(t("adm.pr.saved"));
       setReloadKey((k) => k + 1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save");
+      setError(err instanceof Error ? err.message : t("adm.pr.saveFailed"));
     } finally {
       setSavingId("");
     }
@@ -107,13 +109,13 @@ export default function AdminProviders() {
     setAdding(true);
     try {
       await createProviderByEmail(email, bio.trim() || undefined);
-      setNotice("Specialist added. They must log out and log in again to see their dashboard.");
+      setNotice(t("adm.pr.added"));
       setEmail("");
       setBio("");
       setProviders(null);
       setReloadKey((k) => k + 1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not add specialist");
+      setError(err instanceof Error ? err.message : t("adm.pr.addFailed"));
     } finally {
       setAdding(false);
     }
@@ -122,19 +124,19 @@ export default function AdminProviders() {
   return (
     <div>
       <form onSubmit={onAdd} className="rounded-xl border border-gray-200 bg-white p-4">
-        <p className="font-medium text-gray-900">Add a specialist</p>
-        <p className="mt-1 text-sm text-gray-500">The person must already have a customer account.</p>
+        <p className="font-medium text-gray-900">{t("adm.pr.addTitle")}</p>
+        <p className="mt-1 text-sm text-gray-500">{t("adm.pr.addHint")}</p>
         <div className="mt-3 flex flex-wrap items-end gap-3">
           <input
             type="email"
             required
-            placeholder="Email of an existing user"
+            placeholder={t("adm.pr.emailPh")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="min-w-56 flex-1 rounded-lg border border-gray-300 p-2"
           />
           <input
-            placeholder="Short bio (optional)"
+            placeholder={t("adm.pr.bioPh")}
             maxLength={500}
             value={bio}
             onChange={(e) => setBio(e.target.value)}
@@ -145,14 +147,14 @@ export default function AdminProviders() {
             disabled={adding}
             className="rounded-lg bg-brand-700 px-4 py-2 text-white hover:bg-brand-800 disabled:opacity-50"
           >
-            {adding ? "Adding..." : "Add"}
+            {adding ? t("adm.sv.adding") : t("adm.pr.add")}
           </button>
         </div>
       </form>
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
       {notice && <p className="mt-4 text-sm text-green-700">{notice}</p>}
-      {!providers && !error && <p className="mt-4 text-gray-500">Loading...</p>}
+      {!providers && !error && <p className="mt-4 text-gray-500">{t("adm.loading")}</p>}
 
       <ul className="mt-4 space-y-3">
         {providers?.map((p) => (
@@ -161,7 +163,7 @@ export default function AdminProviders() {
             <p className="text-sm text-gray-500">{p.email}</p>
             {p.bio && <p className="mt-1 text-sm text-gray-600">{p.bio}</p>}
 
-            <p className="mt-3 text-sm font-medium text-gray-700">Services offered</p>
+            <p className="mt-3 text-sm font-medium text-gray-700">{t("adm.pr.servicesOffered")}</p>
             <div className="mt-2 flex flex-wrap gap-3">
               {services.map((s) => (
                 <label key={s.id} className="flex items-center gap-2 text-sm text-gray-700">
@@ -171,7 +173,7 @@ export default function AdminProviders() {
                     onChange={() => toggleService(p.id, s.id)}
                   />
                   {s.name}
-                  {!s.isActive && <span className="text-xs text-gray-400">(hidden)</span>}
+                  {!s.isActive && <span className="text-xs text-gray-400">{t("adm.hiddenTag")}</span>}
                 </label>
               ))}
             </div>
@@ -180,8 +182,8 @@ export default function AdminProviders() {
               .filter((s) => (selected[p.id] ?? []).includes(s.id) && s.variants.length > 0)
               .map((s) => (
                 <div key={s.id} className="mt-4">
-                  <p className="text-sm font-medium text-gray-700">{s.name}: styles and own prices</p>
-                  <p className="text-xs text-gray-500">Leave price and minutes empty to use the style's defaults.</p>
+                  <p className="text-sm font-medium text-gray-700">{t("adm.pr.stylesTitle", { service: s.name })}</p>
+                  <p className="text-xs text-gray-500">{t("adm.pr.stylesHint")}</p>
                   <ul className="mt-2 space-y-2">
                     {s.variants.map((v) => {
                       const row = styles[p.id]?.[v.id] ?? { on: false, price: "", minutes: "" };
@@ -194,16 +196,16 @@ export default function AdminProviders() {
                               onChange={(e) => patchRow(p.id, v.id, { on: e.target.checked })}
                             />
                             {v.name}
-                            {!v.isActive && <span className="text-xs text-gray-400">(hidden)</span>}
+                            {!v.isActive && <span className="text-xs text-gray-400">{t("adm.hiddenTag")}</span>}
                           </label>
                           <input
                             type="number"
                             min={0}
                             disabled={!row.on}
-                            placeholder={`${v.price} ETB`}
+                            placeholder={t("adm.money", { n: v.price })}
                             value={row.price}
                             onChange={(e) => patchRow(p.id, v.id, { price: e.target.value })}
-                            aria-label={`${v.name} price`}
+                            aria-label={t("adm.pr.priceAria", { name: v.name })}
                             className="w-28 rounded-lg border border-gray-300 p-1.5 disabled:bg-gray-100"
                           />
                           <input
@@ -211,10 +213,10 @@ export default function AdminProviders() {
                             min={5}
                             max={480}
                             disabled={!row.on}
-                            placeholder={`${v.durationMinutes} min`}
+                            placeholder={t("adm.min", { n: v.durationMinutes })}
                             value={row.minutes}
                             onChange={(e) => patchRow(p.id, v.id, { minutes: e.target.value })}
-                            aria-label={`${v.name} minutes`}
+                            aria-label={t("adm.pr.minutesAria", { name: v.name })}
                             className="w-28 rounded-lg border border-gray-300 p-1.5 disabled:bg-gray-100"
                           />
                         </li>
@@ -229,7 +231,7 @@ export default function AdminProviders() {
               disabled={savingId === p.id}
               className="mt-4 rounded-lg border border-gray-300 px-3 py-1 text-sm hover:bg-gray-100 disabled:opacity-50"
             >
-              {savingId === p.id ? "Saving..." : "Save"}
+              {savingId === p.id ? t("adm.pr.saving") : t("adm.pr.save")}
             </button>
           </li>
         ))}

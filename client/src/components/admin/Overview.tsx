@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { getAdminStats, type AdminStats } from "../../lib/api";
+import { useI18n } from "../../i18n/useI18n";
 import BarChart from "./BarChart";
-
-const money = (n: number) => `${new Intl.NumberFormat("en-US").format(n)} ETB`;
 
 function Card({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
@@ -15,9 +14,12 @@ function Card({ label, value, hint }: { label: string; value: string; hint?: str
 }
 
 export default function Overview() {
+  const { t } = useI18n();
   const [days, setDays] = useState(30);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [error, setError] = useState("");
+
+  const money = (n: number) => t("adm.money", { n: new Intl.NumberFormat("en-US").format(n) });
 
   useEffect(() => {
     let cancelled = false;
@@ -52,51 +54,55 @@ export default function Overview() {
               days === d ? "border-brand-700 bg-brand-700 text-white" : "border-gray-300 bg-white hover:bg-gray-100"
             }`}
           >
-            Last {d} days
+            {t("adm.ov.lastDays", { d })}
           </button>
         ))}
       </div>
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
-      {!stats && !error && <p className="mt-4 text-gray-500">Loading...</p>}
+      {!stats && !error && <p className="mt-4 text-gray-500">{t("adm.loading")}</p>}
 
       {stats && (
         <div className="mt-4 space-y-6">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Card
-              label="Bookings"
+              label={t("adm.ov.bookings")}
               value={String(stats.totals.bookings)}
-              hint={`${stats.totals.completed} completed · ${stats.totals.scheduled} scheduled`}
+              hint={t("adm.ov.bookingsHint", {
+                completed: stats.totals.completed,
+                scheduled: stats.totals.scheduled,
+              })}
             />
-            <Card label="Booked value" value={money(stats.totals.revenue)} hint="At the price when booked" />
+            <Card label={t("adm.ov.value")} value={money(stats.totals.revenue)} hint={t("adm.ov.valueHint")} />
             <Card
-              label="Cancellation rate"
+              label={t("adm.ov.cancelRate")}
               value={`${(stats.totals.cancellationRate * 100).toFixed(1)}%`}
-              hint={`${stats.totals.cancelled} cancelled`}
+              hint={t("adm.ov.cancelHint", { n: stats.totals.cancelled })}
             />
             <Card
-              label="No-show rate"
+              label={t("adm.ov.noShowRate")}
               value={`${(stats.totals.noShowRate * 100).toFixed(1)}%`}
-              hint={`${stats.totals.noShow} of ${stats.totals.completed + stats.totals.noShow} finished appointments`}
+              hint={t("adm.ov.noShowHint", {
+                n: stats.totals.noShow,
+                total: stats.totals.completed + stats.totals.noShow,
+              })}
             />
-            <Card label="Upcoming" value={String(stats.upcoming)} hint="Confirmed, from now on" />
+            <Card label={t("adm.ov.upcoming")} value={String(stats.upcoming)} hint={t("adm.ov.upcomingHint")} />
           </div>
 
           <section className="rounded-xl border border-gray-200 bg-white p-4">
-            <h2 className="font-semibold text-gray-900">Bookings per day</h2>
-            <p className="mb-3 text-sm text-gray-500">
-              {stats.from} to {stats.to}, by appointment date
-            </p>
+            <h2 className="font-semibold text-gray-900">{t("adm.ov.perDay")}</h2>
+            <p className="mb-3 text-sm text-gray-500">{t("adm.ov.range", { from: stats.from, to: stats.to })}</p>
             <BarChart data={stats.perDay} />
-            {stats.truncated && (
-              <p className="mt-2 text-xs text-amber-700">Showing the first 10,000 bookings of this period only.</p>
-            )}
+            {stats.truncated && <p className="mt-2 text-xs text-amber-700">{t("adm.ov.truncated")}</p>}
           </section>
 
           <div className="grid gap-6 lg:grid-cols-2">
             <section className="rounded-xl border border-gray-200 bg-white p-4">
-              <h2 className="font-semibold text-gray-900">Top services</h2>
-              {stats.topServices.length === 0 && <p className="mt-2 text-sm text-gray-500">No bookings in this period.</p>}
+              <h2 className="font-semibold text-gray-900">{t("adm.ov.top")}</h2>
+              {stats.topServices.length === 0 && (
+                <p className="mt-2 text-sm text-gray-500">{t("adm.ov.noneInPeriod")}</p>
+              )}
               <ul className="mt-3 space-y-3">
                 {stats.topServices.map((s) => (
                   <li key={s.id}>
@@ -115,18 +121,18 @@ export default function Overview() {
             </section>
 
             <section className="rounded-xl border border-gray-200 bg-white p-4">
-              <h2 className="font-semibold text-gray-900">People</h2>
+              <h2 className="font-semibold text-gray-900">{t("adm.ov.people")}</h2>
               <dl className="mt-3 space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <dt className="text-gray-600">Customers</dt>
+                  <dt className="text-gray-600">{t("adm.ov.customers")}</dt>
                   <dd className="font-medium text-gray-900">{stats.users.customers}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-gray-600">Specialists</dt>
+                  <dt className="text-gray-600">{t("adm.ov.specialists")}</dt>
                   <dd className="font-medium text-gray-900">{stats.users.providers}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-gray-600">Admins</dt>
+                  <dt className="text-gray-600">{t("adm.ov.admins")}</dt>
                   <dd className="font-medium text-gray-900">{stats.users.admins}</dd>
                 </div>
               </dl>

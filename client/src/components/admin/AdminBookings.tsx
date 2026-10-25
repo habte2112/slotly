@@ -1,11 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cancelBooking, getAdminBookings, type AdminBooking } from "../../lib/api";
-
-const formatter = new Intl.DateTimeFormat("en-GB", {
-  timeZone: "Africa/Addis_Ababa",
-  dateStyle: "medium",
-  timeStyle: "short",
-});
+import { useI18n } from "../../i18n/useI18n";
+import { intlLocale } from "../../i18n/format";
 
 const statusStyle: Record<AdminBooking["status"], string> = {
   PENDING: "bg-yellow-100 text-yellow-800",
@@ -15,11 +11,30 @@ const statusStyle: Record<AdminBooking["status"], string> = {
   NO_SHOW: "bg-red-100 text-red-800",
 };
 
+const statusKey = {
+  PENDING: "adm.st.pending",
+  CONFIRMED: "adm.st.confirmed",
+  CANCELLED: "adm.st.cancelled",
+  COMPLETED: "adm.st.completed",
+  NO_SHOW: "adm.st.noShow",
+} as const;
+
 export default function AdminBookings() {
+  const { t, locale } = useI18n();
   const [scope, setScope] = useState<"upcoming" | "past">("upcoming");
   const [bookings, setBookings] = useState<AdminBooking[] | null>(null);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState("");
+
+  const formatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(intlLocale(locale), {
+        timeZone: "Africa/Addis_Ababa",
+        dateStyle: "medium",
+        timeStyle: "short",
+      }),
+    [locale],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -42,14 +57,14 @@ export default function AdminBookings() {
   }
 
   async function onCancel(id: string) {
-    if (!window.confirm("Cancel this booking? The customer will be notified by email.")) return;
+    if (!window.confirm(t("adm.bk.confirmCancel"))) return;
     setBusyId(id);
     setError("");
     try {
       await cancelBooking(id);
       setBookings((list) => list?.map((b) => (b.id === id ? { ...b, status: "CANCELLED" } : b)) ?? null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not cancel");
+      setError(err instanceof Error ? err.message : t("adm.bk.cancelFailed"));
     } finally {
       setBusyId("");
     }
@@ -62,18 +77,20 @@ export default function AdminBookings() {
           <button
             key={s}
             onClick={() => changeScope(s)}
-            className={`rounded-lg border px-3 py-1 text-sm capitalize ${
+            className={`rounded-lg border px-3 py-1 text-sm ${
               scope === s ? "border-brand-700 bg-brand-700 text-white" : "border-gray-300 bg-white hover:bg-gray-100"
             }`}
           >
-            {s}
+            {s === "upcoming" ? t("adm.bk.upcoming") : t("adm.bk.past")}
           </button>
         ))}
       </div>
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
-      {!bookings && !error && <p className="mt-4 text-gray-500">Loading...</p>}
-      {bookings?.length === 0 && <p className="mt-4 text-gray-600">No {scope} bookings.</p>}
+      {!bookings && !error && <p className="mt-4 text-gray-500">{t("adm.loading")}</p>}
+      {bookings?.length === 0 && (
+        <p className="mt-4 text-gray-600">{scope === "upcoming" ? t("adm.bk.noUpcoming") : t("adm.bk.noPast")}</p>
+      )}
 
       <ul className="mt-4 space-y-3">
         {bookings?.map((b) => {
@@ -89,7 +106,7 @@ export default function AdminBookings() {
                   {b.customer.name} ({b.customer.email})
                 </p>
                 <span className={`mt-2 inline-block rounded-full px-2 py-0.5 text-xs ${statusStyle[b.status]}`}>
-                  {b.status === "NO_SHOW" ? "no-show" : b.status.toLowerCase()}
+                  {t(statusKey[b.status])}
                 </span>
               </div>
               {active && scope === "upcoming" && (
@@ -98,7 +115,7 @@ export default function AdminBookings() {
                   disabled={busyId === b.id}
                   className="shrink-0 rounded-lg border border-gray-300 px-3 py-1 text-sm hover:bg-gray-100 disabled:opacity-50"
                 >
-                  {busyId === b.id ? "Cancelling..." : "Cancel"}
+                  {busyId === b.id ? t("adm.bk.cancelling") : t("adm.bk.cancel")}
                 </button>
               )}
             </li>

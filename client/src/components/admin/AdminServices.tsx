@@ -10,6 +10,7 @@ import {
   type AdminService,
   type AdminStyle,
 } from "../../lib/api";
+import { useI18n } from "../../i18n/useI18n";
 
 function StyleRow({
   style,
@@ -20,13 +21,14 @@ function StyleRow({
   onChange: (s: AdminStyle) => void;
   onError: (message: string) => void;
 }) {
+  const { t } = useI18n();
   const [uploading, setUploading] = useState(false);
 
   async function toggle() {
     try {
       onChange({ ...style, ...(await updateStyle(style.id, { isActive: !style.isActive })) });
     } catch (err) {
-      onError(err instanceof Error ? err.message : "Could not update style");
+      onError(err instanceof Error ? err.message : t("adm.sv.updateStyleFailed"));
     }
   }
 
@@ -39,7 +41,7 @@ function StyleRow({
       const saved = await setStyleImage(style.id, url);
       onChange({ ...style, imageUrl: saved.imageUrl });
     } catch (err) {
-      onError(err instanceof Error ? err.message : "Could not upload image");
+      onError(err instanceof Error ? err.message : t("adm.sv.uploadFailed"));
     } finally {
       setUploading(false);
     }
@@ -62,8 +64,8 @@ function StyleRow({
           <div className="h-10 w-14 rounded bg-slate-100" />
         )}
         <span className={style.isActive ? "text-slate-900" : "text-slate-400 line-through"}>
-          {style.name} · {style.durationMinutes} min · {style.price} ETB
-          {!style.isActive && " (hidden)"}
+          {style.name} · {t("adm.min", { n: style.durationMinutes })} · {t("adm.money", { n: style.price })}
+          {!style.isActive && ` ${t("adm.hiddenTag")}`}
         </span>
       </div>
       <div className="flex items-center gap-2">
@@ -72,7 +74,7 @@ function StyleRow({
             uploading ? "pointer-events-none opacity-50" : ""
           }`}
         >
-          {uploading ? "Uploading..." : "Image"}
+          {uploading ? t("adm.sv.uploading") : t("adm.sv.image")}
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp"
@@ -84,7 +86,7 @@ function StyleRow({
           />
         </label>
         <button onClick={toggle} className="rounded-lg border border-slate-300 px-2 py-1 hover:bg-slate-100">
-          {style.isActive ? "Hide" : "Show"}
+          {style.isActive ? t("adm.sv.hide") : t("adm.sv.show")}
         </button>
       </div>
     </li>
@@ -92,6 +94,7 @@ function StyleRow({
 }
 
 function AddStyle({ service, onAdded }: { service: AdminService; onAdded: (s: AdminStyle) => void }) {
+  const { t } = useI18n();
   const [name, setName] = useState("");
   const [duration, setDuration] = useState("30");
   const [price, setPrice] = useState("");
@@ -112,7 +115,7 @@ function AddStyle({ service, onAdded }: { service: AdminService; onAdded: (s: Ad
       setName("");
       setPrice("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not add style");
+      setError(err instanceof Error ? err.message : t("adm.sv.addStyleFailed"));
     } finally {
       setBusy(false);
     }
@@ -123,7 +126,7 @@ function AddStyle({ service, onAdded }: { service: AdminService; onAdded: (s: Ad
       <input
         required
         minLength={2}
-        placeholder="New style name"
+        placeholder={t("adm.sv.newStyleName")}
         value={name}
         onChange={(e) => setName(e.target.value)}
         className="min-w-40 flex-1 rounded-lg border border-slate-300 p-2 text-sm"
@@ -135,17 +138,17 @@ function AddStyle({ service, onAdded }: { service: AdminService; onAdded: (s: Ad
         max={480}
         value={duration}
         onChange={(e) => setDuration(e.target.value)}
-        aria-label="Duration in minutes"
+        aria-label={t("adm.sv.durationAria")}
         className="w-24 rounded-lg border border-slate-300 p-2 text-sm"
       />
       <input
         type="number"
         required
         min={0}
-        placeholder="ETB"
+        placeholder={t("adm.sv.etb")}
         value={price}
         onChange={(e) => setPrice(e.target.value)}
-        aria-label="Price in ETB"
+        aria-label={t("adm.sv.priceAria")}
         className="w-28 rounded-lg border border-slate-300 p-2 text-sm"
       />
       <button
@@ -153,7 +156,7 @@ function AddStyle({ service, onAdded }: { service: AdminService; onAdded: (s: Ad
         disabled={busy}
         className="rounded-lg bg-brand-700 px-3 py-2 text-sm text-white hover:bg-brand-800 disabled:opacity-50"
       >
-        {busy ? "Adding..." : "Add style"}
+        {busy ? t("adm.sv.adding") : t("adm.sv.addStyle")}
       </button>
       {error && <p className="w-full text-sm text-red-600">{error}</p>}
     </form>
@@ -161,6 +164,7 @@ function AddStyle({ service, onAdded }: { service: AdminService; onAdded: (s: Ad
 }
 
 export default function AdminServices() {
+  const { t } = useI18n();
   const [services, setServices] = useState<AdminService[] | null>(null);
   const [error, setError] = useState("");
   const [name, setName] = useState("");
@@ -193,7 +197,7 @@ export default function AdminServices() {
       setDescription("");
       setPrice("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create service");
+      setError(err instanceof Error ? err.message : t("adm.sv.createFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -205,7 +209,7 @@ export default function AdminServices() {
       const updated = await updateService(service.id, { isActive: !service.isActive });
       setServices((list) => list?.map((s) => (s.id === service.id ? { ...s, ...updated } : s)) ?? null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update service");
+      setError(err instanceof Error ? err.message : t("adm.sv.updateFailed"));
     }
   }
 
@@ -224,24 +228,24 @@ export default function AdminServices() {
   return (
     <div>
       <form onSubmit={onSubmit} className="rounded-xl border border-gray-200 bg-white p-4">
-        <p className="font-medium text-gray-900">Add a service</p>
+        <p className="font-medium text-gray-900">{t("adm.sv.addService")}</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <input
             required
             minLength={2}
-            placeholder="Name"
+            placeholder={t("adm.sv.name")}
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="rounded-lg border border-gray-300 p-2"
           />
           <input
-            placeholder="Description (optional)"
+            placeholder={t("adm.sv.desc")}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             className="rounded-lg border border-gray-300 p-2"
           />
           <label className="text-sm text-gray-600">
-            Duration (minutes, 5-480)
+            {t("adm.sv.duration")}
             <input
               type="number"
               required
@@ -254,7 +258,7 @@ export default function AdminServices() {
             />
           </label>
           <label className="text-sm text-gray-600">
-            Price (ETB)
+            {t("adm.sv.price")}
             <input
               type="number"
               required
@@ -271,12 +275,12 @@ export default function AdminServices() {
           disabled={submitting}
           className="mt-3 rounded-lg bg-brand-700 px-4 py-2 text-white hover:bg-brand-800 disabled:opacity-50"
         >
-          {submitting ? "Adding..." : "Add service"}
+          {submitting ? t("adm.sv.adding") : t("adm.sv.addServiceBtn")}
         </button>
       </form>
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
-      {!services && !error && <p className="mt-4 text-gray-500">Loading...</p>}
+      {!services && !error && <p className="mt-4 text-gray-500">{t("adm.loading")}</p>}
 
       <ul className="mt-4 space-y-3">
         {services?.map((s) => (
@@ -285,19 +289,20 @@ export default function AdminServices() {
               <div>
                 <p className={`font-medium ${s.isActive ? "text-gray-900" : "text-gray-400 line-through"}`}>{s.name}</p>
                 <p className="text-sm text-gray-500">
-                  {s.durationMinutes} min · {s.price} ETB {s.isActive ? "" : "· hidden from customers"}
+                  {t("adm.min", { n: s.durationMinutes })} · {t("adm.money", { n: s.price })}{" "}
+                  {s.isActive ? "" : t("adm.sv.hiddenFromCustomers")}
                 </p>
               </div>
               <button
                 onClick={() => toggle(s)}
                 className="rounded-lg border border-gray-300 px-3 py-1 text-sm hover:bg-gray-100"
               >
-                {s.isActive ? "Hide" : "Show"}
+                {s.isActive ? t("adm.sv.hide") : t("adm.sv.show")}
               </button>
             </div>
 
             <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-500">
-              Styles ({s.variants.length})
+              {t("adm.sv.styles", { n: s.variants.length })}
             </p>
             <ul>
               {s.variants.map((v) => (

@@ -1,3 +1,5 @@
+import { useI18n } from "../../i18n/useI18n";
+
 interface Point {
   date: string;
   bookings: number;
@@ -5,15 +7,16 @@ interface Point {
 }
 
 export default function BarChart({ data }: { data: Point[] }) {
+  const { t } = useI18n();
   const max = Math.max(1, ...data.map((d) => d.bookings + d.cancelled));
 
   return (
     <div>
-      <div className="flex h-40 items-end gap-px" role="img" aria-label="Bookings per day">
+      <div className="flex h-40 items-end gap-px" role="img" aria-label={t("adm.chart.label")}>
         {data.map((d) => (
           <div
             key={d.date}
-            title={`${d.date}: ${d.bookings} booked, ${d.cancelled} cancelled`}
+            title={t("adm.chart.tip", { date: d.date, booked: d.bookings, cancelled: d.cancelled })}
             className="flex h-full flex-1 flex-col justify-end"
           >
             <div className="bg-red-300" style={{ height: `${(d.cancelled / max) * 100}%` }} />
@@ -27,10 +30,10 @@ export default function BarChart({ data }: { data: Point[] }) {
       </div>
       <div className="mt-2 flex gap-4 text-xs text-gray-600">
         <span className="flex items-center gap-1">
-          <span className="inline-block h-2 w-2 bg-brand-700" /> Booked
+          <span className="inline-block h-2 w-2 bg-brand-700" /> {t("adm.chart.booked")}
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block h-2 w-2 bg-red-300" /> Cancelled
+          <span className="inline-block h-2 w-2 bg-red-300" /> {t("adm.chart.cancelled")}
         </span>
       </div>
     </div>
