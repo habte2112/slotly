@@ -101,6 +101,7 @@ export default function AdminBookings() {
                 <p className="font-medium text-gray-900">
                   {b.variant ? `${b.service.name} · ${b.variant.name}` : b.service.name} · {b.provider.user.name}
                 </p>
+                <p className="text-sm text-gray-600">{formatter.format(new Date(b.startAt))}</p>
                 <p className="text-sm text-gray-500">
                   {b.customer.name}
                   {b.customer.phone && (
