@@ -241,7 +241,7 @@ export async function updateBookingStatus(req: AuthRequest, res: Response) {
 const OFFSET_MS = 3 * 60 * 60 * 1000; // Africa/Addis_Ababa (UTC+3)
 const localDate = (d: Date) => new Date(d.getTime() + OFFSET_MS).toISOString().slice(0, 10);
 
-const manualSchema = z.object({
+export const manualSchema = z.object({
   customerName: z.string().trim().min(2).max(80),
   customerPhone: z.string().trim().min(7).max(25),
   serviceId: z.string().min(1),
@@ -250,26 +250,19 @@ const manualSchema = z.object({
   notes: z.string().trim().max(500).optional(),
 });
 
-// ባለሙያው ለስልክ ወይም ለቀጥታ ደንበኛ ቀጠሮ ይመዘግባል (ደንበኛው መለያ አያስፈልገውም)
-export async function createManualBooking(req: AuthRequest, res: Response) {
-  const parsed = manualSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ message: parsed.error.issues[0]?.message ?? "Invalid input" });
-    return;
-  }
-  const phone = normalizePhone(parsed.data.customerPhone);
+// ለአንድ ባለሙያ የእጅ ቀጠሮ ይመዘግባል (ባለሙያው ራሱ፣ ወይም admin/ሪሴፕሽን ከመረጠ)
+// ደንበኛው መለያ አያስፈልገውም
+export async function bookManual(providerId: string, data: z.infer<typeof manualSchema>, res: Response) {
+  const phone = normalizePhone(data.customerPhone);
   if (!phone) {
     res.status(400).json({ message: "Please enter a valid phone number" });
     return;
   }
 
-  const provider = await getOwnProvider(req, res);
-  if (!provider) return;
+  const { customerName, serviceId, variantId, notes } = data;
+  const startAt = new Date(data.startAt);
 
-  const { customerName, serviceId, variantId, notes } = parsed.data;
-  const startAt = new Date(parsed.data.startAt);
-
-  const availability = await loadAvailability(provider.id, serviceId, localDate(startAt), variantId);
+  const availability = await loadAvailability(providerId, serviceId, localDate(startAt), variantId);
   if (!availability.ok) {
     res.status(availability.status).json({ message: availability.message });
     return;
@@ -299,7 +292,7 @@ export async function createManualBooking(req: AuthRequest, res: Response) {
     const booking = await prisma.booking.create({
       data: {
         customerId: guest.id,
-        providerId: provider.id,
+        providerId,
         serviceId,
         variantId: offering.variant?.id,
         startAt,
@@ -309,8 +302,8 @@ export async function createManualBooking(req: AuthRequest, res: Response) {
       },
       select: providerBookingSelect,
     });
-      const [created] = await withNoShows([booking]);
-      res.status(201).json({ booking: created });
+    const [created] = await withNoShows([booking]);
+    res.status(201).json({ booking: created });
   } catch (error) {
     if (isOverlapError(error)) {
       res.status(409).json({ message: "This time slot was just taken" });
@@ -318,4 +311,15 @@ export async function createManualBooking(req: AuthRequest, res: Response) {
     }
     throw error;
   }
+}
+
+export async function createManualBooking(req: AuthRequest, res: Response) {
+  const parsed = manualSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: parsed.error.issues[0]?.message ?? "Invalid input" });
+    return;
+  }
+  const provider = await getOwnProvider(req, res);
+  if (!provider) return;
+  await bookManual(provider.id, parsed.data, res);
 }

@@ -5,10 +5,12 @@ import AdminBookings from "../components/admin/AdminBookings";
 import AdminServices from "../components/admin/AdminServices";
 import AdminProviders from "../components/admin/AdminProviders";
 import AdminReviews from "../components/admin/AdminReviews";
+import AdminNewBooking from "../components/admin/AdminNewBooking";
 
 const TABS = [
   { id: "overview", label: "adm.tab.overview" },
   { id: "bookings", label: "adm.tab.bookings" },
+  { id: "add", label: "adm.tab.add" },
   { id: "services", label: "adm.tab.services" },
   { id: "specialists", label: "adm.tab.specialists" },
   { id: "reviews", label: "adm.tab.reviews" },
@@ -41,6 +43,7 @@ export default function Admin() {
       <div className="mt-6">
         {tab === "overview" && <Overview />}
         {tab === "bookings" && <AdminBookings />}
+        {tab === "add" && <AdminNewBooking />}
         {tab === "services" && <AdminServices />}
         {tab === "specialists" && <AdminProviders />}
         {tab === "reviews" && <AdminReviews />}

@@ -368,6 +368,10 @@ export const en = {
   "adm.pr.minutesAria": "{name} minutes",
   "adm.pr.save": "Save",
   "adm.pr.saving": "Saving...",
+    // ---- admin: new booking ----
+  "adm.tab.add": "New booking",
+  "adm.nb.chooseSpecialist": "Choose specialist",
+  "adm.nb.saved": "Booking saved for {name} at {time}.",
 } as const;
 
 export type Messages = Record<keyof typeof en, string>;

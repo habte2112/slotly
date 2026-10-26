@@ -371,4 +371,8 @@ export const am: Messages = {
   "adm.pr.minutesAria": "የ{name} ደቂቃ",
   "adm.pr.save": "አስቀምጥ",
   "adm.pr.saving": "በማስቀመጥ ላይ...",
+    // ---- admin: new booking ----
+  "adm.tab.add": "አዲስ ቀጠሮ",
+  "adm.nb.chooseSpecialist": "ባለሙያ ምረጥ",
+  "adm.nb.saved": "ለ{name} በ{time} ቀጠሮ ተመዝግቧል።",
 };

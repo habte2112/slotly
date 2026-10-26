@@ -526,6 +526,74 @@ describeDb("Slotly API", () => {
     });
   });
 
+  describe("admin booking for phone and walk-in customers", () => {
+    const DATE_W = addDays(DATE_A, 63); // ሰኞ
+    const phone = `09${Math.floor(10_000_000 + Math.random() * 89_999_999)}`;
+    const guestName = `Reception ${tag}`;
+
+    const create = (token: string | null, body: object) => {
+      const req = request(app).post("/api/admin/bookings");
+      return (token ? req.set(bearer(token)) : req).send(body);
+    };
+    const valid = (time: string, extra: object = {}) => ({
+      providerId,
+      customerName: guestName,
+      customerPhone: phone,
+      serviceId,
+      startAt: at(DATE_W, time),
+      ...extra,
+    });
+
+    afterAll(async () => {
+      const mine = { isGuest: true, name: { startsWith: guestName } };
+      await prisma.booking.deleteMany({ where: { customer: mine } });
+      await prisma.user.deleteMany({ where: mine });
+    }, 60000);
+
+    it("is available to admins only", async () => {
+      expect((await create(null, valid("09:00"))).status).toBe(401);
+      expect((await create(customer1Token, valid("09:00"))).status).toBe(403);
+      expect((await create(providerToken, valid("09:00"))).status).toBe(403);
+    });
+
+    it("validates the input and the specialist", async () => {
+      expect((await create(adminToken, { providerId })).status).toBe(400);
+      expect((await create(adminToken, valid("09:00", { customerPhone: "abc" }))).status).toBe(400);
+      expect((await create(adminToken, valid("09:00", { providerId: "no-such-provider" }))).status).toBe(404);
+    });
+
+    it("books a slot for any specialist without a customer account", async () => {
+      const res = await create(adminToken, valid("09:00"));
+      expect(res.status).toBe(201);
+      expect(res.body.booking).toMatchObject({
+        status: "CONFIRMED",
+        priceAtBooking: 100,
+        startAt: at(DATE_W, "09:00"),
+        endAt: at(DATE_W, "09:30"),
+      });
+      expect(res.body.booking.customer.name).toBe(guestName);
+
+      // ባለሙያው በራሱ ዝርዝር ውስጥ ያየዋል
+      const mine = await request(app).get("/api/provider/bookings").set(bearer(providerToken));
+      expect(mine.body.bookings.some((b: { id: string }) => b.id === res.body.booking.id)).toBe(true);
+    });
+
+    it("rejects a taken slot and a time outside working hours", async () => {
+      expect((await create(adminToken, valid("09:00"))).status).toBe(409);
+      expect((await book(customer1Token, at(DATE_W, "09:00"))).status).toBe(409);
+      expect((await create(adminToken, valid("20:00"))).status).toBe(409);
+    });
+
+    it("reuses the same guest for the same phone number", async () => {
+      const res = await create(adminToken, valid("10:00", { customerName: `${guestName} again` }));
+      expect(res.status).toBe(201);
+
+      const guests = await prisma.user.findMany({ where: { isGuest: true, name: { startsWith: guestName } } });
+      expect(guests).toHaveLength(1);
+      expect(await prisma.booking.count({ where: { customerId: guests[0].id } })).toBe(2);
+    });
+  });
+
   describe("price at booking", () => {
     it("keeps the price a customer agreed to when the service price changes later", async () => {
       const priced = await prisma.service.create({

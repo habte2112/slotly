@@ -233,6 +233,20 @@ export const createManualBooking = (input: {
     body: JSON.stringify(input),
   }).then((r) => r.booking);
 
+  export const createAdminBooking = (input: {
+  providerId: string;
+  customerName: string;
+  customerPhone: string;
+  serviceId: string;
+  variantId?: string;
+  startAt: string;
+  notes?: string;
+}) =>
+  request<{ booking: ProviderBooking }>("/admin/bookings", {
+    method: "POST",
+    body: JSON.stringify(input),
+  }).then((r) => r.booking);
+
 // ---- Reschedule ----
 export const getRescheduleSlots = (bookingId: string, date: string) =>
   request<{ slots: Slot[] }>(`/bookings/${bookingId}/availability?date=${date}`).then((r) => r.slots);

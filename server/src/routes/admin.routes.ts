@@ -10,6 +10,7 @@ import { authenticate, requireRole } from "../middleware/auth";
 import { createVariant, updateVariant, setProviderVariants } from "../controllers/admin-variants.controller";
 import { getUploadSignature, setVariantImage } from "../controllers/admin-images.controller";
 import { listAdminReviews, setReviewHidden } from "../controllers/reviews.controller";
+import { createAdminBooking } from "../controllers/admin-bookings.controller";
 
 
 export const adminRouter = Router();
@@ -18,6 +19,7 @@ adminRouter.use(authenticate, requireRole("ADMIN"));
 
 adminRouter.get("/stats", getStats);
 adminRouter.get("/bookings", listAdminBookings);
+adminRouter.post("/bookings", createAdminBooking);
 adminRouter.get("/services", listAdminServices);
 adminRouter.get("/providers", listAdminProviders);
 adminRouter.post("/providers", createProviderByEmail);
