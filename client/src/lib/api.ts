@@ -296,7 +296,7 @@ export interface AdminBooking {
   startAt: string;
   endAt: string;
   status: Booking["status"];
-  customer: { name: string; email: string };
+  customer: { name: string; email: string; phone: string | null; isGuest: boolean };
   provider: { user: { name: string } };
   service: { name: string };
   variant: { name: string } | null;

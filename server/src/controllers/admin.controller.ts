@@ -121,7 +121,7 @@ const adminBookingSelect = {
   endAt: true,
   status: true,
   priceAtBooking: true,
-  customer: { select: { name: true, email: true } },
+  customer: { select: { name: true, email: true, phone: true, isGuest: true } },
   provider: { select: { user: { select: { name: true } } } },
   service: { select: { name: true } },
   variant: { select: { name: true } },

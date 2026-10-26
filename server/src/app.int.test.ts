@@ -592,6 +592,15 @@ describeDb("Slotly API", () => {
       expect(guests).toHaveLength(1);
       expect(await prisma.booking.count({ where: { customerId: guests[0].id } })).toBe(2);
     });
+    
+    it("shows the customer's phone and marks guests in the admin booking list", async () => {
+      const res = await request(app).get("/api/admin/bookings").set(bearer(adminToken));
+      expect(res.status).toBe(200);
+      const row = res.body.bookings.find((b: { customer: { name: string } }) => b.customer.name === guestName);
+      expect(row).toBeTruthy();
+      expect(row.customer.isGuest).toBe(true);
+      expect(row.customer.phone).toContain(phone.slice(-8));
+    });
   });
 
   describe("price at booking", () => {
