@@ -117,7 +117,13 @@ export default function ProviderBookings() {
                   )}
                 </p>
                 <p className="text-sm text-gray-600">{formatter.format(new Date(b.startAt))}</p>
-                {b.customer.phone && <p className="text-sm text-gray-500">{b.customer.phone}</p>}
+                {b.customer.phone && (
+                  <p className="text-sm text-gray-500">
+                    <a href={`tel:${b.customer.phone}`} className="text-brand-700 hover:underline">
+                      {b.customer.phone}
+                    </a>
+                  </p>
+                )}
                 {b.notes && <p className="mt-1 text-sm italic text-gray-500">“{b.notes}”</p>}
                 <span className={`mt-2 inline-block rounded-full px-2 py-0.5 text-xs ${statusStyle[b.status]}`}>
                   {t(`status.${b.status}`)}
