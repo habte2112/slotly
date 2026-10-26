@@ -15,3 +15,26 @@ export function ethiopianTime(hhmm: string): string {
 export function timeWithLocal(locale: Locale, hhmm: string): string {
   return locale === "am" ? `${hhmm} (${ethiopianTime(hhmm)})` : hhmm;
 }
+
+const ADDIS = "Africa/Addis_Ababa";
+const hhmmFormat = new Intl.DateTimeFormat("en-GB", {
+  timeZone: ADDIS,
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+// ቀንና ሰዓት (የአዲስ አበባ ሰዓት)፤ አማርኛ ሞድ ላይ ሰዓቱ ከኢትዮጵያ ሰዓት ጋር
+// እንግሊዝኛ: "26 Oct 2026, 10:00" · አማርኛ: "<ቀን>, 10:00 (ጠዋት 4 ሰዓት)"
+export function dateTimeWithLocal(locale: Locale, value: string | Date): string {
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (locale !== "am") {
+    return new Intl.DateTimeFormat(intlLocale(locale), {
+      timeZone: ADDIS,
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(d);
+  }
+  const date = new Intl.DateTimeFormat(intlLocale(locale), { timeZone: ADDIS, dateStyle: "medium" }).format(d);
+  return `${date}, ${timeWithLocal(locale, hhmmFormat.format(d))}`;
+}

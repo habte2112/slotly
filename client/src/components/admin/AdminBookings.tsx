@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { cancelBooking, getAdminBookings, type AdminBooking } from "../../lib/api";
 import { useI18n } from "../../i18n/useI18n";
-import { intlLocale } from "../../i18n/format";
+import { dateTimeWithLocal } from "../../i18n/format";
 
 const statusStyle: Record<AdminBooking["status"], string> = {
   PENDING: "bg-yellow-100 text-yellow-800",
@@ -26,15 +26,6 @@ export default function AdminBookings() {
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState("");
 
-  const formatter = useMemo(
-    () =>
-      new Intl.DateTimeFormat(intlLocale(locale), {
-        timeZone: "Africa/Addis_Ababa",
-        dateStyle: "medium",
-        timeStyle: "short",
-      }),
-    [locale],
-  );
 
   useEffect(() => {
     let cancelled = false;
@@ -101,7 +92,7 @@ export default function AdminBookings() {
                 <p className="font-medium text-gray-900">
                   {b.variant ? `${b.service.name} · ${b.variant.name}` : b.service.name} · {b.provider.user.name}
                 </p>
-                <p className="text-sm text-gray-600">{formatter.format(new Date(b.startAt))}</p>
+                <p className="text-sm text-gray-600">{dateTimeWithLocal(locale, b.startAt)}</p>
                 <p className="text-sm text-gray-500">
                   {b.customer.name}
                   {b.customer.phone && (

@@ -1,13 +1,14 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { createAdminBooking, getAvailability, getProviders, type Provider, type Slot } from "../../lib/api";
 import { useI18n } from "../../i18n/useI18n";
+import { timeWithLocal } from "../../i18n/format";
 
 const todayInAddis = () => new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
 const maxDateInAddis = () =>
   new Date(Date.now() + 3 * 60 * 60 * 1000 + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
 export default function AdminNewBooking() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [providers, setProviders] = useState<Provider[] | null>(null);
   const [providerId, setProviderId] = useState("");
   const [name, setName] = useState("");
@@ -78,7 +79,7 @@ export default function AdminNewBooking() {
         startAt: selected.start,
         notes: notes.trim() || undefined,
       });
-      setNotice(t("adm.nb.saved", { name, time: selected.label }));
+      setNotice(t("adm.nb.saved", { name, time: timeWithLocal(locale, selected.label) }));
       // ቀጣዩን ደንበኛ ለማስገባት ባለሙያውና ቀኑ ይቆያሉ
       setName("");
       setPhone("");
@@ -193,7 +194,7 @@ export default function AdminNewBooking() {
                   : "border-gray-300 bg-white hover:border-brand-600"
               }`}
             >
-              {s.label}
+            {timeWithLocal(locale, s.label)}
             </button>
           ))}
         </div>

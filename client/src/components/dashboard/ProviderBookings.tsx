@@ -1,13 +1,9 @@
 import { useEffect, useState } from "react";
 import { getProviderBookings, updateProviderBookingStatus, type ProviderBooking } from "../../lib/api";
 import { useI18n } from "../../i18n/useI18n";
+import { dateTimeWithLocal } from "../../i18n/format";
 import ManualBookingForm from "./ManualBookingForm";
 
-const formatter = new Intl.DateTimeFormat("en-GB", {
-  timeZone: "Africa/Addis_Ababa",
-  dateStyle: "medium",
-  timeStyle: "short",
-});
 
 const statusStyle: Record<ProviderBooking["status"], string> = {
   PENDING: "bg-yellow-100 text-yellow-800",
@@ -18,7 +14,7 @@ const statusStyle: Record<ProviderBooking["status"], string> = {
 };
 
 export default function ProviderBookings() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [scope, setScope] = useState<"upcoming" | "past">("upcoming");
   const [bookings, setBookings] = useState<ProviderBooking[] | null>(null);
   const [error, setError] = useState("");
@@ -116,7 +112,7 @@ export default function ProviderBookings() {
                     </span>
                   )}
                 </p>
-                <p className="text-sm text-gray-600">{formatter.format(new Date(b.startAt))}</p>
+                <p className="text-sm text-gray-600">  {dateTimeWithLocal(locale, b.startAt)}</p>
                 {b.customer.phone && (
                   <p className="text-sm text-gray-500">
                     <a href={`tel:${b.customer.phone}`} className="text-brand-700 hover:underline">
