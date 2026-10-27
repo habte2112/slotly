@@ -79,7 +79,9 @@ export default function AdminNewBooking() {
         startAt: selected.start,
         notes: notes.trim() || undefined,
       });
-      setNotice(t("adm.nb.saved", { name, time: timeWithLocal(locale, selected.label) }));
+      setNotice(
+        t("adm.nb.saved", { name, specialist: provider.name, time: timeWithLocal(locale, selected.label) }),
+      );
       // ቀጣዩን ደንበኛ ለማስገባት ባለሙያውና ቀኑ ይቆያሉ
       setName("");
       setPhone("");
@@ -208,6 +210,16 @@ export default function AdminNewBooking() {
         onChange={(e) => setNotes(e.target.value)}
         className={`${input} mt-3`}
       />
+
+      {selected && provider && (
+        <p className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-2 text-sm font-medium text-gray-900">
+          {t("adm.nb.summary", {
+            specialist: provider.name,
+            date,
+            time: timeWithLocal(locale, selected.label),
+          })}
+        </p>
+      )}
 
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       {notice && <p className="mt-2 text-sm text-green-700">{notice}</p>}

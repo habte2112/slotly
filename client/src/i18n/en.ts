@@ -371,7 +371,8 @@ export const en = {
     // ---- admin: new booking ----
   "adm.tab.add": "New booking",
   "adm.nb.chooseSpecialist": "Choose specialist",
-  "adm.nb.saved": "Booking saved for {name} at {time}.",
+  "adm.nb.saved": "Booking saved for {name} with {specialist} at {time}.",
+  "adm.nb.summary": "Booking for {specialist} on {date} at {time}",
 } as const;
 
 export type Messages = Record<keyof typeof en, string>;

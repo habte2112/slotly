@@ -374,5 +374,6 @@ export const am: Messages = {
     // ---- admin: new booking ----
   "adm.tab.add": "አዲስ ቀጠሮ",
   "adm.nb.chooseSpecialist": "ባለሙያ ምረጥ",
-  "adm.nb.saved": "ለ{name} በ{time} ቀጠሮ ተመዝግቧል።",
+  "adm.nb.saved": "ለ{name} ከ{specialist} ጋር በ{time} ቀጠሮ ተመዝግቧል።",
+  "adm.nb.summary": "ለ{specialist} ቀጠሮ ይያዛል፦ {date}፣ {time}",
 };
