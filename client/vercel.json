@@ -1,6 +1,6 @@
 {
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://slotly-api-nsfp.onrender.com/api/:path*" },
+    { "source": "/api/:path*", "destination": "https://slotly-pilot-api.onrender.com/api/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
