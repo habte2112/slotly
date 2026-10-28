@@ -12,3 +12,4 @@ skills-lock.json
 
 # Prisma generated client
 server/src/generated
+server/pilot/salon.json
