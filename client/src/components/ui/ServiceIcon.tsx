@@ -1,10 +1,13 @@
-type Kind = "hair" | "color" | "health" | "default";
+type Kind = "hair" | "color" | "beard" | "wash" | "health" | "default";
 
 // ስሙ ውስጥ ባለ ቃል ላይ ተመስርቶ አዶ ይመርጣል (ቀለም መጀመሪያ ይፈተሻል፣ "Hair Coloring" ን ለመለየት)
 function kindOf(name: string): Kind {
   const n = name.toLowerCase();
-  if (/colou?r|dye|tint/.test(n)) return "color";
-  if (/hair|cut|barber|trim|style/.test(n)) return "hair";
+  if (/colou?r|dye|tint|highlight|root/.test(n)) return "color";
+  if (/wash|massage|treatment|spa/.test(n)) return "wash";
+  if (/combo|haircut|hair/.test(n)) return "hair";
+  if (/beard|shave|razor/.test(n)) return "beard";
+  if (/cut|barber|trim|style|fade|kid/.test(n)) return "hair";
   if (/check|doctor|clinic|health|consult|medical|dental|therapy/.test(n)) return "health";
   return "default";
 }
@@ -30,6 +33,19 @@ export default function ServiceIcon({ name, className = "h-6 w-6" }: { name: str
         </>
       )}
       {kind === "color" && <path d="M12 3.5s6 6.2 6 10.5a6 6 0 0 1-12 0c0-4.3 6-10.5 6-10.5Z" />}
+      {kind === "beard" && (
+        <>
+          <rect x="3" y="13" width="18" height="6" rx="2" />
+          <path d="M6 13V8h9l3 5M8 16h8" />
+        </>
+      )}
+      {kind === "wash" && (
+        <>
+          <circle cx="9" cy="14" r="4.5" />
+          <circle cx="17" cy="8" r="3" />
+          <circle cx="16" cy="17.5" r="2" />
+        </>
+      )}
       {kind === "health" && (
         <>
           <rect x="4" y="4" width="16" height="16" rx="4" />

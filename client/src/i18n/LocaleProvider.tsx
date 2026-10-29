@@ -12,6 +12,8 @@ function initialLocale(): Locale {
   } catch {
     /* ችላ በል */
   }
+  const fallback = import.meta.env.VITE_DEFAULT_LOCALE;
+  if (fallback === "am" || fallback === "en") return fallback;
   return navigator.language?.toLowerCase().startsWith("am") ? "am" : "en";
 }
 
