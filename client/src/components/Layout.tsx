@@ -5,6 +5,7 @@ import Avatar from "./ui/Avatar";
 import LanguageSwitcher from "./LanguageSwitcher";
 import LocaleSync from "./LocaleSync";
 import Logo from "./ui/Logo";
+import { BRAND_NAME } from "../lib/brand";
 
 // VITE_DEMO="false" ሲሆን "Portfolio demo" ማስታወቂያ እና የ GitHub አገናኝ ይጠፋሉ (ለእውነተኛ ሳሎን)
 const IS_DEMO = import.meta.env.VITE_DEMO !== "false";
@@ -23,7 +24,7 @@ export default function Layout() {
         <nav className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
           <Link to="/" className="flex items-center gap-2 text-lg font-bold text-slate-900">
             <Logo />
-            Slotly
+            <span>{BRAND_NAME}</span>
           </Link>
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
@@ -74,7 +75,7 @@ export default function Layout() {
 
       <footer className="border-t border-slate-200 bg-white">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2 px-4 py-6 text-sm text-slate-500">
-          <span>{t(IS_DEMO ? "layout.footer" : "layout.footerReal", { year: new Date().getFullYear() })}</span>
+          <span>{t(IS_DEMO ? "layout.footer" : "layout.footerReal", { year: new Date().getFullYear(), brand: BRAND_NAME })}</span>
           {IS_DEMO && (
             <a
               href="https://github.com/habte2112/slotly"
