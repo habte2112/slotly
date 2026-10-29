@@ -14,7 +14,7 @@ export const en = {
   "nav.signUp": "Sign up",
 
   "layout.demoNotice": "Portfolio demo: please do not enter real personal data.",
-  "layout.footer": "© {year} Slotly · Portfolio project",
+  "layout.footer": "© {year} {brand} · Portfolio project",
   "layout.source": "View source on GitHub",
 
   "dash.title": "Dashboard",
@@ -265,7 +265,7 @@ export const en = {
   "err.alreadyStatus": "This booking is already recorded: {status}.",
   "err.timeOffConflict": "You have {count} booking(s) in this period. Cancel them first.",
   "err.generic": "The request failed.",
-  "layout.footerReal": "© {year} Slotly",
+  "layout.footerReal": "© {year} {brand}",
 
     // ---- admin (ዙር 1) ----
   "adm.title": "Admin",

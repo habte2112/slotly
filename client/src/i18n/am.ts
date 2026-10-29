@@ -16,7 +16,7 @@ export const am: Messages = {
   "nav.signUp": "ተመዝገብ",
 
   "layout.demoNotice": "የሙከራ ማሳያ፡ እባክዎ እውነተኛ የግል መረጃ አያስገቡ።",
-  "layout.footer": "© {year} Slotly · የፖርትፎሊዮ ፕሮጀክት",
+  "layout.footer": "© {year} {brand} · የፖርትፎሊዮ ፕሮጀክት",
   "layout.source": "ምንጭ ኮዱን በGitHub ይመልከቱ",
 
   "dash.title": "ዳሽቦርድ",
@@ -269,7 +269,7 @@ export const am: Messages = {
   "err.alreadyStatus": "ይህ ቀጠሮ አስቀድሞ ተመዝግቧል፦ {status}።",
   "err.timeOffConflict": "በዚህ ጊዜ ውስጥ {count} ቀጠሮ(ዎች) አለዎት። መጀመሪያ እነሱን ይሰርዙ።",
   "err.generic": "ጥያቄው አልተሳካም።",
-  "layout.footerReal": "© {year} Slotly",
+    "layout.footerReal": "© {year} {brand}",
 
     // ---- admin (ዙር 1) ----
   "adm.title": "አስተዳዳሪ",
