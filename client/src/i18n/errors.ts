@@ -31,6 +31,8 @@ const EXACT: Record<string, keyof Messages> = {
   "Time off not found": "err.timeOffNotFound",
   "Provider profile not found": "err.providerMissing",
   "This reset link is invalid or has expired": "err.resetInvalid",
+  "Current password is incorrect": "err.wrongCurrent",
+  "New password must be different from the current one": "err.samePassword",
   "Request failed": "err.generic",
 };
 

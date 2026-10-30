@@ -188,3 +188,47 @@ export async function resetPassword(req: Request, res: Response) {
   }
   res.json({ message: "Password updated. You can now log in." });
 }
+
+// ---- Change password (ገብቶ ያለ ተጠቃሚ) ----
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8).max(100),
+});
+
+export async function changePassword(req: AuthRequest, res: Response) {
+  const parsed = changePasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: "Invalid input", errors: formatIssues(parsed.error) });
+    return;
+  }
+  const { currentPassword, newPassword } = parsed.data;
+
+  const user = await prisma.user.findUnique({
+    where: { id: req.user!.id },
+    select: { id: true, role: true, passwordHash: true },
+  });
+  if (!user) {
+    res.status(404).json({ message: "User not found" });
+    return;
+  }
+
+  const ok = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!ok) {
+    res.status(400).json({ message: "Current password is incorrect" });
+    return;
+  }
+  if (currentPassword === newPassword) {
+    res.status(400).json({ message: "New password must be different from the current one" });
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: user.id }, data: { passwordHash, passwordChangedAt: new Date() } }),
+    // ቀድሞ የተላኩ የ reset links ይሻራሉ
+    prisma.passwordResetToken.deleteMany({ where: { userId: user.id } }),
+  ]);
+
+  // ሌሎች መሳሪያዎች ላይ ያሉ ቶከኖች ይሻራሉ፤ ይህ መሳሪያ አዲስ ቶከን ያገኛል
+  res.json({ message: "Password updated.", token: signToken(user) });
+}

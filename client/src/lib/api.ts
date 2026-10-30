@@ -267,6 +267,16 @@ export const resetPassword = (token: string, password: string) =>
     body: JSON.stringify({ token, password }),
   });
 
+export async function changePassword(currentPassword: string, newPassword: string) {
+  const res = await request<{ message: string; token: string }>("/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  // የይለፍ ቃል ሲቀየር አሮጌው ቶከን ይሻራል፤ በዚህ መሳሪያ ላይ አዲሱን እናስቀምጣለን
+  tokenStore.set(res.token);
+  return res;
+}
+
 // ---- Admin ----
 export interface AdminStats {
   days: number;

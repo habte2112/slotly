@@ -603,6 +603,73 @@ describeDb("Slotly API", () => {
     });
   });
 
+  describe("change password", () => {
+    const NEW_PASSWORD = "BrandNewPass456";
+    const addr = email("pwchange");
+    let userId = "";
+    let token = "";
+
+    const change = (tok: string | null, body: object) => {
+      const r = request(app).post("/api/auth/change-password");
+      return (tok ? r.set(bearer(tok)) : r).send(body);
+    };
+
+    beforeAll(async () => {
+      const passwordHash = await bcrypt.hash(PASSWORD, 4);
+      const u = await prisma.user.create({
+        data: { name: "pwchange", email: addr, passwordHash, role: "CUSTOMER" },
+      });
+      userId = u.id;
+      token = await login(addr);
+    });
+
+    it("requires a logged-in user", async () => {
+      const res = await change(null, { currentPassword: PASSWORD, newPassword: NEW_PASSWORD });
+      expect(res.status).toBe(401);
+    });
+
+    it("rejects a wrong current password", async () => {
+      const res = await change(token, { currentPassword: "WrongPassword999", newPassword: NEW_PASSWORD });
+      expect(res.status).toBe(400);
+      expect(res.body.message).toBe("Current password is incorrect");
+    });
+
+    it("rejects a new password that is too short", async () => {
+      const res = await change(token, { currentPassword: PASSWORD, newPassword: "short" });
+      expect(res.status).toBe(400);
+    });
+
+    it("rejects a new password equal to the current one", async () => {
+      const res = await change(token, { currentPassword: PASSWORD, newPassword: PASSWORD });
+      expect(res.status).toBe(400);
+      expect(res.body.message).toBe("New password must be different from the current one");
+    });
+
+    it("changes the password, issues a fresh token and revokes older ones", async () => {
+      // ከለውጡ በፊት የተሰጠ (በ 60 ሰከንድ ቀድሞ) ቶከን
+      const oldToken = jwt.sign(
+        { role: "CUSTOMER", iat: Math.floor(Date.now() / 1000) - 60 },
+        process.env.JWT_SECRET!,
+        { subject: userId, expiresIn: "7d", algorithm: "HS256" },
+      );
+      expect((await request(app).get("/api/auth/me").set(bearer(oldToken))).status).toBe(200);
+
+      const res = await change(token, { currentPassword: PASSWORD, newPassword: NEW_PASSWORD });
+      expect(res.status).toBe(200);
+      expect(typeof res.body.token).toBe("string");
+
+      // አዲሱ ቶከን ይሰራል፣ አሮጌው ተሽሯል
+      expect((await request(app).get("/api/auth/me").set(bearer(res.body.token))).status).toBe(200);
+      expect((await request(app).get("/api/auth/me").set(bearer(oldToken))).status).toBe(401);
+
+      // በአዲሱ የይለፍ ቃል ብቻ መግባት ይቻላል
+      const bad = await request(app).post("/api/auth/login").send({ email: addr, password: PASSWORD });
+      expect(bad.status).toBe(401);
+      const good = await request(app).post("/api/auth/login").send({ email: addr, password: NEW_PASSWORD });
+      expect(good.status).toBe(200);
+    });
+  });
+
   describe("price at booking", () => {
     it("keeps the price a customer agreed to when the service price changes later", async () => {
       const priced = await prisma.service.create({
