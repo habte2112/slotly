@@ -1,7 +1,7 @@
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const DEFAULT_DESCRIPTION =
@@ -9,11 +9,12 @@ const DEFAULT_DESCRIPTION =
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-// የሳሎኑን ስም (VITE_BRAND_*) ወደ index.html እና ወደ PWA manifest ያስገባል
+// የሳሎኑን ስም እና አርማ (VITE_BRAND_*) ወደ index.html፣ ወደ PWA manifest እና ወደ dist ያስገባል
 function brand(env: Record<string, string>): Plugin {
   const name = env.VITE_BRAND_NAME || "Slotly";
   const short = env.VITE_BRAND_SHORT || name;
   const description = env.VITE_BRAND_DESCRIPTION || DEFAULT_DESCRIPTION;
+  const assets = env.VITE_BRAND_ASSETS || ""; // ለምሳሌ "fitawrari" → client/brand/fitawrari/
   let root = process.cwd();
   let outDir = "dist";
   let isBuild = false;
@@ -26,14 +27,30 @@ function brand(env: Record<string, string>): Plugin {
       isBuild = cfg.command === "build";
     },
     transformIndexHtml(html) {
-      return html
+      let out = html
         .replace(/\{\{BRAND_NAME\}\}/g, () => esc(name))
         .replace(/\{\{BRAND_SHORT\}\}/g, () => esc(short))
         .replace(/\{\{BRAND_DESCRIPTION\}\}/g, () => esc(description));
+      if (assets) {
+        out = out.replace(
+          '<link rel="icon" type="image/svg+xml" href="/favicon.svg" />',
+          '<link rel="icon" type="image/png" href="/favicon.png" />',
+        );
+      }
+      return out;
     },
-    // manifest ቋሚ ፋይል ስለሆነ ከ build በኋላ ስሙን ይተካል
     closeBundle() {
       if (!isBuild) return;
+      // የሳሎኑ አዶዎች የ Slotly አዶዎችን በ dist ውስጥ ይተካሉ
+      if (assets) {
+        const dir = resolve(root, "brand", assets);
+        if (existsSync(dir)) {
+          for (const f of readdirSync(dir)) copyFileSync(resolve(dir, f), resolve(root, outDir, f));
+        } else {
+          console.warn(`[brand] folder not found: ${dir}`);
+        }
+      }
+      // manifest ቋሚ ፋይል ስለሆነ ከ build በኋላ ስሙን ይተካል
       const file = resolve(root, outDir, "manifest.webmanifest");
       if (!existsSync(file)) return;
       const manifest = JSON.parse(readFileSync(file, "utf8"));
