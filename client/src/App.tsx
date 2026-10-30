@@ -11,6 +11,7 @@ import Reschedule from "./pages/Reschedule";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Admin from "./pages/Admin";
+import Account from "./pages/Account";
 import NotFound from "./pages/NotFound";
 import SpecialistProfile from "./pages/SpecialistProfile";
 
@@ -29,6 +30,7 @@ export default function App() {
 
       <Route element={<ProtectedRoute />}>
         <Route path="/my-bookings" element={<MyBookings />} />
+        <Route path="/account" element={<Account />} />
         <Route path="/reschedule/:id" element={<Reschedule />} />
     </Route>
 

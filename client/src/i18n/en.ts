@@ -373,6 +373,17 @@ export const en = {
   "adm.nb.chooseSpecialist": "Choose specialist",
   "adm.nb.saved": "Booking saved for {name} with {specialist} at {time}.",
   "adm.nb.summary": "Booking for {specialist} on {date} at {time}",
+  "nav.account": "Account",
+  "acc.title": "My account",
+  "acc.pwTitle": "Change password",
+  "acc.current": "Current password",
+  "acc.new": "New password (min 8 characters)",
+  "acc.repeat": "Repeat new password",
+  "acc.submit": "Update password",
+  "acc.submitting": "Saving...",
+  "acc.done": "Your password has been changed.",
+  "err.wrongCurrent": "The current password is incorrect.",
+  "err.samePassword": "The new password must be different from the current one.",
 } as const;
 
 export type Messages = Record<keyof typeof en, string>;

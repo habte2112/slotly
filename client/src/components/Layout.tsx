@@ -44,10 +44,15 @@ export default function Layout() {
                 <Link to="/my-bookings" className="text-slate-700 hover:text-brand-700">
                   {t("nav.myBookings")}
                 </Link>
-                <span className="flex items-center gap-2 text-slate-600">
+                <Link
+                  to="/account"
+                  title={t("nav.account")}
+                  aria-label={t("nav.account")}
+                  className="flex items-center gap-2 text-slate-600 hover:text-brand-700"
+                >
                   <Avatar name={user.name} className="h-7 w-7 text-xs" />
                   <span className="hidden sm:inline">{user.name}</span>
-                </span>
+                </Link>
                 <button
                   onClick={signOut}
                   className="rounded-lg border border-slate-300 px-3 py-1.5 text-slate-700 hover:bg-slate-100"
