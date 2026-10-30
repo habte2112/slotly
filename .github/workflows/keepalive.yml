@@ -1,0 +1,18 @@
+name: keepalive-pilot
+
+on:
+  schedule:
+    # በየ10 ደቂቃው፣ 05:00–18:50 UTC = 08:00–21:50 በኢትዮጵያ ሰዓት
+    - cron: "*/10 5-18 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping pilot API
+        env:
+          PILOT_API_URL: ${{ secrets.PILOT_API_URL }}
+        run: |
+          if [ -z "$PILOT_API_URL" ]; then echo "PILOT_API_URL not set, skipping"; exit 0; fi
+          curl -fsS --retry 2 --retry-delay 5 --max-time 90 "$PILOT_API_URL/api/ping"

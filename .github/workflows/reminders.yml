@@ -2,11 +2,15 @@ name: Send booking reminders
 
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    # ፓይለት: በየ30 ደቂቃ፣ 05:00–18:59 UTC = 08:00–21:59 በኢትዮጵያ ሰዓት
+    - cron: "*/30 5-18 * * *"
+    # ዲሞ: በየ3 ሰዓት (የ Render ነጻ ሰዓት ለመቆጠብ)
+    - cron: "0 */3 * * *"
   workflow_dispatch:
 
 jobs:
   remind-demo:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 */3 * * *'
     runs-on: ubuntu-latest
     steps:
       - name: Call the demo reminders endpoint
@@ -20,6 +24,7 @@ jobs:
             -H "Authorization: Bearer $CRON_SECRET"
 
   remind-pilot:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '*/30 5-18 * * *'
     runs-on: ubuntu-latest
     steps:
       - name: Call the pilot reminders endpoint
