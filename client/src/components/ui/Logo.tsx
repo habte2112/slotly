@@ -1,4 +1,9 @@
-export default function Logo({ className = "h-8 w-8" }: { className?: string }) {
+const HAS_BRAND_LOGO = Boolean(import.meta.env.VITE_BRAND_ASSETS);
+
+export default function Logo({ className = "h-9 w-9" }: { className?: string }) {
+  if (HAS_BRAND_LOGO) {
+    return <img src="/logo.png" alt="" className={`${className} rounded-full object-cover`} />;
+  }
   return (
     <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
       <rect width="32" height="32" rx="8" fill="#0f766e" />
