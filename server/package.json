@@ -11,7 +11,8 @@
     "test": "vitest run",
     "db:migrate:test": "tsx scripts/migrate-test-db.ts",
     "seed:test": "tsx scripts/seed-test-db.ts",
-    "pilot:setup": "tsx scripts/pilot-setup.ts"
+    "pilot:setup": "tsx scripts/pilot-setup.ts",
+    "pilot:reset-password": "tsx scripts/pilot-reset-password.ts"
   },
   "keywords": [],
   "author": "",
