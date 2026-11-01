@@ -201,6 +201,11 @@ export async function changePassword(req: AuthRequest, res: Response) {
     res.status(400).json({ message: "Invalid input", errors: formatIssues(parsed.error) });
     return;
   }
+    // በይፋ ዲሞ ላይ የዲሞ መለያዎች በጎብኝዎች እንዳይበላሹ
+  if (process.env.DEMO_MODE === "true") {
+    res.status(403).json({ message: "Password changes are disabled in the demo" });
+    return;
+  }
   const { currentPassword, newPassword } = parsed.data;
 
   const user = await prisma.user.findUnique({

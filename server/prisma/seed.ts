@@ -166,6 +166,7 @@ const STAFF: Staff[] = [
 async function main() {
   // ማስታወሻ፦ ይህ የመጀመሪያ ጊዜ ብቻ የሚሰራ የ demo password ነው፤ ነባር admin password አይቀየርም
   await upsertUser("Slotly Admin", "admin@slotly.dev", "ADMIN", "Admin12345");
+  await upsertUser("Demo Customer", "customer@slotly.dev", "CUSTOMER", "Customer123");
 
   const base = {
     Haircut: await ensureService("Haircut", 30, 300, "Classic cut and styling"),

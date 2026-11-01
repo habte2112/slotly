@@ -384,6 +384,12 @@ export const en = {
   "acc.done": "Your password has been changed.",
   "err.wrongCurrent": "The current password is incorrect.",
   "err.samePassword": "The new password must be different from the current one.",
+  "auth.demo.title": "Try the demo",
+  "auth.demo.hint": "Sign in with one click to explore each role. No sign-up needed.",
+  "auth.demo.customer": "As a customer",
+  "auth.demo.specialist": "As a specialist",
+  "auth.demo.admin": "As an admin",
+  "err.demoLocked": "Password changes are disabled in the demo.",
 } as const;
 
 export type Messages = Record<keyof typeof en, string>;

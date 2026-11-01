@@ -387,4 +387,10 @@ export const am: Messages = {
   "acc.done": "የይለፍ ቃልዎ ተቀይሯል።",
   "err.wrongCurrent": "አሁን ያለው የይለፍ ቃል ልክ አይደለም።",
   "err.samePassword": "አዲሱ የይለፍ ቃል ከአሁኑ የተለየ መሆን አለበት።",
+  "auth.demo.title": "ዲሞውን ይሞክሩ",
+  "auth.demo.hint": "በአንድ ጠቅታ ይግቡና እያንዳንዱን ሚና ይመልከቱ፤ መመዝገብ አያስፈልግም።",
+  "auth.demo.customer": "እንደ ደንበኛ",
+  "auth.demo.specialist": "እንደ ባለሙያ",
+  "auth.demo.admin": "እንደ አስተዳዳሪ",
+  "err.demoLocked": "በዲሞው ውስጥ የይለፍ ቃል መቀየር አይቻልም።",
 };
