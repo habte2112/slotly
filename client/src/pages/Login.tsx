@@ -3,6 +3,14 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/auth-context";
 import { useI18n } from "../i18n/useI18n";
 
+// ዲሞ ላይ ብቻ፤ ሁሉም ይፋ የዲሞ መለያዎች ናቸው (በ seed ውስጥ ያሉ)
+const IS_DEMO = import.meta.env.VITE_DEMO !== "false";
+const DEMO_ACCOUNTS = [
+  { label: "auth.demo.customer", email: "CUSTOMER_EMAIL", password: "CUSTOMER_PASSWORD", to: "/" },
+  { label: "auth.demo.specialist", email: "selam@slotly.dev", password: "Provider123", to: "/dashboard" },
+  { label: "auth.demo.admin", email: "ADMIN_EMAIL", password: "ADMIN_PASSWORD", to: "/admin" },
+] as const;
+
 export default function Login() {
   const { t } = useI18n();
   const { signIn } = useAuth();
@@ -21,6 +29,19 @@ export default function Login() {
     try {
       await signIn(email, password);
       navigate(from);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.error"));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function demoLogin(account: (typeof DEMO_ACCOUNTS)[number]) {
+    setError("");
+    setSubmitting(true);
+    try {
+      await signIn(account.email, account.password);
+      navigate(account.to);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     } finally {
@@ -68,6 +89,25 @@ export default function Login() {
           {t("nav.signUp")}
         </Link>
       </p>
+      {IS_DEMO && (
+        <div className="mt-8 rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-sm font-semibold text-gray-900">{t("auth.demo.title")}</p>
+          <p className="mt-1 text-xs text-gray-600">{t("auth.demo.hint")}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {DEMO_ACCOUNTS.map((a) => (
+              <button
+                key={a.label}
+                type="button"
+                disabled={submitting}
+                onClick={() => demoLogin(a)}
+                className="rounded-lg border border-brand-700 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-slate-100 disabled:opacity-50"
+              >
+                {t(a.label)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

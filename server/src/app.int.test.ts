@@ -645,6 +645,16 @@ describeDb("Slotly API", () => {
       expect(res.body.message).toBe("New password must be different from the current one");
     });
 
+    it("is disabled when DEMO_MODE is on", async () => {
+      process.env.DEMO_MODE = "true";
+      try {
+        const res = await change(token, { currentPassword: PASSWORD, newPassword: NEW_PASSWORD });
+        expect(res.status).toBe(403);
+      } finally {
+        delete process.env.DEMO_MODE;
+      }
+    });
+
     it("changes the password, issues a fresh token and revokes older ones", async () => {
       // ከለውጡ በፊት የተሰጠ (በ 60 ሰከንድ ቀድሞ) ቶከን
       const oldToken = jwt.sign(

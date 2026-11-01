@@ -33,6 +33,7 @@ const EXACT: Record<string, keyof Messages> = {
   "This reset link is invalid or has expired": "err.resetInvalid",
   "Current password is incorrect": "err.wrongCurrent",
   "New password must be different from the current one": "err.samePassword",
+  "Password changes are disabled in the demo": "err.demoLocked",
   "Request failed": "err.generic",
 };
 
