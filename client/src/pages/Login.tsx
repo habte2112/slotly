@@ -6,9 +6,9 @@ import { useI18n } from "../i18n/useI18n";
 // ዲሞ ላይ ብቻ፤ ሁሉም ይፋ የዲሞ መለያዎች ናቸው (በ seed ውስጥ ያሉ)
 const IS_DEMO = import.meta.env.VITE_DEMO !== "false";
 const DEMO_ACCOUNTS = [
-  { label: "auth.demo.customer", email: "CUSTOMER_EMAIL", password: "CUSTOMER_PASSWORD", to: "/" },
+  { label: "auth.demo.customer", email: "customer@slotly.dev", password: "Customer123", to: "/" },
   { label: "auth.demo.specialist", email: "selam@slotly.dev", password: "Provider123", to: "/dashboard" },
-  { label: "auth.demo.admin", email: "ADMIN_EMAIL", password: "ADMIN_PASSWORD", to: "/admin" },
+  { label: "auth.demo.admin", email: "admin@slotly.dev", password: "Admin12345", to: "/admin" },
 ] as const;
 
 export default function Login() {
